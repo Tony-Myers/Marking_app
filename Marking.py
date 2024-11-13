@@ -88,53 +88,56 @@ def main():
                 # Convert rubric to CSV string for prompt
                 rubric_csv_string = original_rubric_df.to_csv(index=False)
 
+                ## Process each submission
                 # Process each submission
-                for submission in submissions:
-                    student_name = os.path.splitext(submission.name)[0]
-                    st.header(f"Processing {student_name}'s Submission")
+            for submission in submissions:
+            student_name = os.path.splitext(submission.name)[0]
+            st.header(f"Processing {student_name}'s Submission")
 
-                    # Read student submission
-                    try:
-                        doc = docx.Document(submission)
-                        student_text = '\n'.join([para.text for para in doc.paragraphs])
-                    except Exception as e:
-                        st.error(f"Error reading submission {submission.name}: {e}")
-                        continue
+    # Read student submission
+    try:
+        doc = docx.Document(submission)
+        student_text = '\n'.join([para.text for para in doc.paragraphs])
+    except Exception as e:
+        st.error(f"Error reading submission {submission.name}: {e}")
+        continue
 
-                    # Prepare prompt for ChatGPT
-# Prepare prompt for ChatGPT
-        prompt = f"""
-You are an experienced educator tasked with grading student assignments based on the following rubric and assignment instructions. Provide feedback directly addressing the student (e.g., "You have demonstrated...") rather than speaking about them in third person (e.g., "The student has demonstrated...").
+    # Prepare prompt for ChatGPT
+    prompt = f"""
+    You are an experienced educator tasked with grading student assignments based on the following rubric and assignment instructions. Provide feedback directly addressing the student (e.g., "You have demonstrated...") rather than speaking about them in third person (e.g., "The student has demonstrated...").
 
-Rubric (in CSV format):
-{rubric_csv_string}
+    Rubric (in CSV format):
+    {rubric_csv_string}
 
-Assignment Task:
-{assignment_task}
+    Assignment Task:
+    {assignment_task}
 
-Student's Submission:
-{student_text}
+    Student's Submission:
+    {student_text}
 
-Your responsibilities:
+    Your responsibilities:
 
-- Provide a completed grading rubric with scores and brief comments for each criterion, in JSON format, matching the rubric provided.
-- Ensure that the JSON includes the keys '{criterion_column}', 'Score', and 'Comment' for each criterion.
-- Write concise overall comments on the quality of the work, using language directly addressing the student.
-- List actionable 'feedforward' bullet points for future improvement, also using direct language.
+    - Provide a completed grading rubric with scores and brief comments for each criterion, in JSON format, matching the rubric provided.
+    - Ensure that the JSON includes the keys '{criterion_column}', 'Score', and 'Comment' for each criterion.
+    - Write concise overall comments on the quality of the work, using language directly addressing the student.
+    - List actionable 'feedforward' bullet points for future improvement, also using direct language.
 
-Please output in the following format:
+    Please output in the following format:
 
-Completed Grading Rubric (JSON):
-[{{"Criterion": "Criterion 1", "Score": "Score 1", "Comment": "Comment 1"}}, 
- {{"Criterion": "Criterion 2", "Score": "Score 2", "Comment": "Comment 2"}},
- ... (continue for all criteria)]
+    Completed Grading Rubric (JSON):
+    [{{"Criterion": "Criterion 1", "Score": "Score 1", "Comment": "Comment 1"}}, 
+     {{"Criterion": "Criterion 2", "Score": "Score 2", "Comment": "Comment 2"}},
+     ... (continue for all criteria)]
 
-Overall Comments:
-[Text]
+    Overall Comments:
+    [Text]
 
-Feedforward:
-[Bullet points]
-"""
+    Feedforward:
+    [Bullet points]
+    """
+
+    # Call ChatGPT API
+    feedback = call_chatgpt(prompt, max_tokens=3000)
 
 
                     # Call ChatGPT API

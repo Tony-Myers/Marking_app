@@ -22,7 +22,7 @@ try:
 except KeyError:
     encoding = tiktoken.get_encoding("cl100k_base")
 
-MAX_TOKENS = 5000  # Maximum tokens for GPT-4
+MAX_TOKENS = 6000  # Maximum tokens for GPT-4
 PROMPT_BUFFER = 1000  # Buffer to ensure we don't exceed the limit
 
 def count_tokens(text, encoding):
@@ -297,90 +297,90 @@ Please output your feedback in the exact format below, ensuring you include **al
                             st.code(feedback)
                             continue
 
-                st.success("All submissions have been processed.")
+            st.success("All submissions have been processed.")
 
-        # After processing, display the feedbacks and download buttons
-        if st.session_state.get('feedbacks'):
-            st.header("Generated Feedbacks")
-            for student_name, feedback_data in st.session_state['feedbacks'].items():
-                st.subheader(f"Feedback for {student_name}")
+    # After processing, display the feedbacks and download buttons
+            if st.session_state.get('feedbacks'):
+                st.header("Generated Feedbacks")
+                for student_name, feedback_data in st.session_state['feedbacks'].items():
+                    st.subheader(f"Feedback for {student_name}")
 
-                merged_rubric_df = feedback_data['merged_rubric_df']
-                overall_comments = feedback_data['overall_comments']
-                feedforward = feedback_data['feedforward']
+                    merged_rubric_df = feedback_data['merged_rubric_df']
+                    overall_comments = feedback_data['overall_comments']
+                    feedforward = feedback_data['feedforward']
 
-                # Display the merged rubric dataframe
-                st.write("Rubric Scores and Comments:")
-                st.dataframe(merged_rubric_df)
+                    # Display the merged rubric dataframe
+                    st.write("Rubric Scores and Comments:")
+                    st.dataframe(merged_rubric_df)
 
-                # Create Word document for feedback
-                feedback_doc = docx.Document()
+                    # Create Word document for feedback
+                    feedback_doc = docx.Document()
 
-                # Set page to landscape
-                section = feedback_doc.sections[0]
-                section.orientation = WD_ORIENT.LANDSCAPE
-                new_width, new_height = section.page_height, section.page_width
-                section.page_width = new_width
-                section.page_height = new_height
+                    # Set page to landscape
+                    section = feedback_doc.sections[0]
+                    section.orientation = WD_ORIENT.LANDSCAPE
+                    new_width, new_height = section.page_height, section.page_width
+                    section.page_width = new_width
+                    section.page_height = new_height
 
-                feedback_doc.add_heading(f"Feedback for {student_name}", level=1)
+                    feedback_doc.add_heading(f"Feedback for {student_name}", level=1)
 
-                if not merged_rubric_df.empty:
-                    # Prepare columns for the Word table
-                    table_columns = [criterion_column] + percentage_columns + ['Score', 'Comment']
-                    table = feedback_doc.add_table(rows=1, cols=len(table_columns))
-                    table.style = 'Table Grid'
-                    hdr_cells = table.rows[0].cells
-                    for i, column in enumerate(table_columns):
-                        hdr_cells[i].text = str(column)
+                    if not merged_rubric_df.empty:
+                        # Prepare columns for the Word table
+                        table_columns = [criterion_column] + percentage_columns + ['Score', 'Comment']
+                        table = feedback_doc.add_table(rows=1, cols=len(table_columns))
+                        table.style = 'Table Grid'
+                        hdr_cells = table.rows[0].cells
+                        for i, column in enumerate(table_columns):
+                            hdr_cells[i].text = str(column)
 
-                    # Add data rows and apply shading to the appropriate descriptor cell
-                    for _, row in merged_rubric_df.iterrows():
-                        row_cells = table.add_row().cells
-                        score = row['Score']
-                        for i, col_name in enumerate(table_columns):
-                            cell = row_cells[i]
-                            cell_text = str(row[col_name])
-                            cell.text = cell_text
+                        # Add data rows and apply shading to the appropriate descriptor cell
+                        for _, row in merged_rubric_df.iterrows():
+                            row_cells = table.add_row().cells
+                            score = row['Score']
+                            for i, col_name in enumerate(table_columns):
+                                cell = row_cells[i]
+                                cell_text = str(row[col_name])
+                                cell.text = cell_text
 
-                            # Apply shading to the descriptor cell matching the score range
-                            if col_name in percentage_columns and pd.notnull(score):
-                                # Extract numeric values from the percentage range
-                                range_text = col_name.replace('%', '').strip()
-                                lower_upper = range_text.split('-')
-                                if len(lower_upper) == 2:
-                                    try:
-                                        lower = float(lower_upper[0].strip())
-                                        upper = float(lower_upper[1].strip())
+                                # Apply shading to the descriptor cell matching the score range
+                                if col_name in percentage_columns and pd.notnull(score):
+                                    # Extract numeric values from the percentage range
+                                    range_text = col_name.replace('%', '').strip()
+                                    lower_upper = range_text.split('-')
+                                    if len(lower_upper) == 2:
+                                        try:
+                                            lower = float(lower_upper[0].strip())
+                                            upper = float(lower_upper[1].strip())
 
-                                        # Use the score as a float
-                                        score_value = float(score)
+                                            # Use the score as a float
+                                            score_value = float(score)
 
-                                        if lower <= score_value <= upper:
-                                            # Apply green shading to this cell
-                                            shading_elm = parse_xml(r'<w:shd {} w:fill="D9EAD3"/>'.format(nsdecls('w')))
-                                            cell._tc.get_or_add_tcPr().append(shading_elm)
-                                    except ValueError as e:
-                                        st.warning(f"Error converting score or range to float: {e}")
-                                        continue
+                                            if lower <= score_value <= upper:
+                                                # Apply green shading to this cell
+                                                shading_elm = parse_xml(r'<w:shd {} w:fill="D9EAD3"/>'.format(nsdecls('w')))
+                                                cell._tc.get_or_add_tcPr().append(shading_elm)
+                                        except ValueError as e:
+                                            st.warning(f"Error converting score or range to float: {e}")
+                                            continue
 
-                # Add overall comments and feedforward
-                feedback_doc.add_heading('Overall Comments', level=2)
-                feedback_doc.add_paragraph(overall_comments.strip())
-                feedback_doc.add_heading('Feedforward', level=2)
-                feedback_doc.add_paragraph(feedforward.strip())
+                    # Add overall comments and feedforward
+                    feedback_doc.add_heading('Overall Comments', level=2)
+                    feedback_doc.add_paragraph(overall_comments.strip())
+                    feedback_doc.add_heading('Feedforward', level=2)
+                    feedback_doc.add_paragraph(feedforward.strip())
 
-                buffer = BytesIO()
-                feedback_doc.save(buffer)
-                buffer.seek(0)
+                    buffer = BytesIO()
+                    feedback_doc.save(buffer)
+                    buffer.seek(0)
 
-                # Provide download button for the feedback document
-                st.download_button(
-                    label=f"Download Feedback for {student_name}",
-                    data=buffer,
-                    file_name=f"{student_name}_feedback.docx",
-                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                )
+                    # Provide download button for the feedback document
+                    st.download_button(
+                        label=f"Download Feedback for {student_name}",
+                        data=buffer,
+                        file_name=f"{student_name}_feedback.docx",
+                        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                    )
 
 if __name__ == "__main__":
     main()

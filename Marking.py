@@ -8,6 +8,7 @@ from docx.oxml import parse_xml
 import os
 from io import BytesIO, StringIO
 import tiktoken
+import csv
 
 # Set your OpenAI API key and password from secrets
 PASSWORD = st.secrets["password"]
@@ -75,8 +76,16 @@ def check_password():
         return True
 
 def parse_csv_section(csv_text):
-    """Parses a CSV section line by line."""
-    return csv_text.strip()
+    """Parses a CSV section line by line, handling quoted fields."""
+    try:
+        # Use StringIO to read the CSV text
+        csv_io = StringIO(csv_text)
+        # Read the CSV with proper quoting
+        df = pd.read_csv(csv_io, dtype={'Criterion': str, 'Score': float}, quotechar='"', skipinitialspace=True)
+        return df
+    except Exception as e:
+        st.error(f"Error parsing CSV: {e}")
+        return None
 
 def summarize_text(text):
     """Summarizes the given text using OpenAI API."""
@@ -124,7 +133,7 @@ def main():
 
                 # Ensure Criterion column is string type for consistency in both dataframes
                 original_rubric_df[criterion_column] = original_rubric_df[criterion_column].astype(str)
-                rubric_csv_string = original_rubric_df.to_csv(index=False)
+                rubric_csv_string = original_rubric_df.to_csv(index=False, quoting=csv.QUOTE_ALL)
 
                 # Get the list of percentage range columns
                 percentage_columns = [col for col in original_rubric_df.columns if '%' in col]
@@ -209,6 +218,7 @@ Please output your feedback in the exact format below, ensuring you include **al
 - **Overall Comments should not exceed 150 words.**
 - **Feedforward should be a bulleted list within 150 words.**
 - **Comments on each criterion should be concise and in the second person, not exceeding 400 words in total.**
+- **Ensure that any fields containing commas are properly quoted.**
 """
 
                     # Estimate total tokens
@@ -243,15 +253,17 @@ Please output your feedback in the exact format below, ensuring you include **al
 
                             # Check if the CSV section is present
                             if 'Criterion,Score,Comment' in csv_feedback:
-                                csv_feedback_cleaned = parse_csv_section(csv_feedback)
+                                completed_rubric_df = parse_csv_section(csv_feedback)
+                                if completed_rubric_df is None:
+                                    st.error("Failed to parse the CSV feedback.")
+                                    st.write("AI Response:")
+                                    st.code(feedback)
+                                    continue
                             else:
                                 st.error("The AI's response is missing the CSV section with 'Criterion,Score,Comment'. Please adjust the prompt or try again.")
                                 st.write("AI Response:")
                                 st.code(feedback)
                                 continue
-
-                            # Load the cleaned CSV section into DataFrame
-                            completed_rubric_df = pd.read_csv(StringIO(csv_feedback_cleaned), dtype={criterion_column: str, 'Score': float})
 
                             # Ensure all criteria are present
                             missing_criteria = set(original_rubric_df[criterion_column]) - set(completed_rubric_df[criterion_column])
@@ -297,9 +309,9 @@ Please output your feedback in the exact format below, ensuring you include **al
                             st.code(feedback)
                             continue
 
-            st.success("All submissions have been processed.")
+                st.success("All submissions have been processed.")
 
-    # After processing, display the feedbacks and download buttons
+        # After processing, display the feedbacks and download buttons
             if st.session_state.get('feedbacks'):
                 st.header("Generated Feedbacks")
                 for student_name, feedback_data in st.session_state['feedbacks'].items():

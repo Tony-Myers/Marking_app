@@ -14,7 +14,7 @@ OPENAI_API_KEY = st.secrets["openai_api_key"]
 # Instantiate the OpenAI client
 client = OpenAI(api_key=OPENAI_API_KEY)
 
-def call_chatgpt(prompt, model="gpt-3.5-turbo", max_tokens=3000, temperature=0.7, retries=2):
+def call_chatgpt(prompt, model="gpt-4o", max_tokens=3000, temperature=0.7, retries=2):
     """Calls the OpenAI API using the client instance and returns the response as text."""
     for attempt in range(retries):
         try:
@@ -170,10 +170,17 @@ Feedforward:
                             st.code(feedback)
                             continue
 
-                        # Create Word document for feedback
+                        # Create Word document for feedback with landscape orientation
                         feedback_doc = docx.Document()
+                        section = feedback_doc.sections[0]
+                        section.orientation = docx.enum.section.WD_ORIENT.LANDSCAPE
+                        new_width, new_height = section.page_height, section.page_width
+                        section.page_width = new_width
+                        section.page_height = new_height
+
                         feedback_doc.add_heading(f"Feedback for {student_name}", level=1)
 
+                        # Add the rubric as a table with shading
                         if not merged_rubric_df.empty:
                             table = feedback_doc.add_table(rows=1, cols=len(merged_rubric_df.columns))
                             table.style = 'Table Grid'
@@ -184,7 +191,13 @@ Feedforward:
                             for _, row in merged_rubric_df.iterrows():
                                 row_cells = table.add_row().cells
                                 for i, col_name in enumerate(merged_rubric_df.columns):
-                                    row_cells[i].text = str(row[col_name])
+                                    cell = row_cells[i]
+                                    cell.text = str(row[col_name])
+
+                                    # Apply green shading to 'Score' and 'Comment' columns
+                                    if col_name in ['Score', 'Comment'] and pd.notnull(row[col_name]):
+                                        shading_elm = parse_xml(r'<w:shd {} w:fill="D9EAD3"/>'.format(nsdecls('w')))
+                                        cell._tc.get_or_add_tcPr().append(shading_elm)
 
                         feedback_doc.add_heading('Overall Comments', level=2)
                         feedback_doc.add_paragraph(overall_comments.strip())

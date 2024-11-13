@@ -51,6 +51,17 @@ def check_password():
     else:
         return True
 
+def parse_csv_section(csv_text):
+    """Parses a CSV section line by line, ensuring each line has exactly three fields."""
+    lines = []
+    for line in csv_text.strip().splitlines():
+        fields = line.split(",", 2)  # Split with max 3 fields to handle extra commas in comments
+        if len(fields) == 3:
+            lines.append(",".join(fields))
+        else:
+            st.warning(f"Skipping malformed line: {line}")  # Debug output for problematic lines
+    return "\n".join(lines)
+
 def main():
     if check_password():
         st.title("🔐 Automated Assignment Grading and Feedback")
@@ -134,17 +145,10 @@ Feedforward:
                             csv_feedback = feedback.split('Overall Comments:')[0].strip()
                             comments_section = feedback.split('Overall Comments:')[1].strip()
 
-                            # Clean and ensure lines have exactly three fields
-                            csv_lines = []
-                            for line in csv_feedback.splitlines():
-                                if line.count(',') >= 2:
-                                    fields = line.split(',', 2)  # Limit to 3 fields
-                                    if len(fields) == 3:
-                                        csv_lines.append(','.join(fields))
+                            # Clean and parse the CSV section
+                            csv_feedback_cleaned = parse_csv_section(csv_feedback)
 
-                            csv_feedback_cleaned = '\n'.join(csv_lines)
-
-                            # Load the CSV section into DataFrame
+                            # Load the cleaned CSV section into DataFrame
                             completed_rubric_df = pd.read_csv(StringIO(csv_feedback_cleaned))
                             overall_comments, feedforward = comments_section.split('Feedforward:')
 
@@ -197,4 +201,3 @@ Feedforward:
 
 if __name__ == "__main__":
     main()
-    

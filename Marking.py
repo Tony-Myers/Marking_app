@@ -96,6 +96,9 @@ def main():
                 original_rubric_df[criterion_column] = original_rubric_df[criterion_column].astype(str)
                 rubric_csv_string = original_rubric_df.to_csv(index=False)
 
+                # Get the list of percentage range columns
+                percentage_columns = [col for col in original_rubric_df.columns if '%' in col]
+
                 for submission in submissions:
                     student_name = os.path.splitext(submission.name)[0]
                     st.header(f"Processing {student_name}'s Submission")
@@ -164,7 +167,7 @@ Feedforward:
                                 completed_rubric_df[[criterion_column, 'Score', 'Comment']],
                                 on=criterion_column,
                                 how='left',
-                                suffixes=('_rubric', '')  # Suffix for original rubric columns
+                                suffixes=('', '_ai')  # Suffix for AI feedback columns
                             ).dropna(how="all", axis=1)
 
                         except Exception as e:
@@ -186,23 +189,38 @@ Feedforward:
                         feedback_doc.add_heading(f"Feedback for {student_name}", level=1)
 
                         if not merged_rubric_df.empty:
-                            table = feedback_doc.add_table(rows=1, cols=len(merged_rubric_df.columns))
+                            # Prepare columns for the Word table
+                            table_columns = [criterion_column] + percentage_columns + ['Score', 'Comment']
+                            table = feedback_doc.add_table(rows=1, cols=len(table_columns))
                             table.style = 'Table Grid'
                             hdr_cells = table.rows[0].cells
-                            for i, column in enumerate(merged_rubric_df.columns):
+                            for i, column in enumerate(table_columns):
                                 hdr_cells[i].text = str(column)
 
-                            # Add data rows and apply shading to selected "Score" cells based on grading decision
+                            # Add data rows and apply shading to the appropriate descriptor cell
                             for _, row in merged_rubric_df.iterrows():
                                 row_cells = table.add_row().cells
-                                for i, col_name in enumerate(merged_rubric_df.columns):
+                                score = row['Score']
+                                for i, col_name in enumerate(table_columns):
                                     cell = row_cells[i]
-                                    cell.text = str(row[col_name])
 
-                                    # Apply shading only to the "Score" cell from AI feedback
-                                    if col_name == 'Score' and pd.notnull(row['Score']):
-                                        shading_elm = parse_xml(r'<w:shd {} w:fill="D9EAD3"/>'.format(nsdecls('w')))
-                                        cell._tc.get_or_add_tcPr().append(shading_elm)
+                                    if col_name == 'Score' or col_name == 'Comment':
+                                        cell.text = str(row[col_name])
+                                    else:
+                                        cell.text = str(row[col_name])
+
+                                    # Apply shading to the descriptor cell matching the score range
+                                    if col_name in percentage_columns and pd.notnull(score):
+                                        # Extract numeric values from the percentage range column
+                                        range_text = col_name.replace('%', '')
+                                        lower_upper = range_text.split('-')
+                                        if len(lower_upper) == 2:
+                                            lower = float(lower_upper[0])
+                                            upper = float(lower_upper[1])
+                                            if lower <= score <= upper:
+                                                # Apply green shading to this cell
+                                                shading_elm = parse_xml(r'<w:shd {} w:fill="D9EAD3"/>'.format(nsdecls('w')))
+                                                cell._tc.get_or_add_tcPr().append(shading_elm)
 
                         # Add overall comments and feedforward
                         feedback_doc.add_heading('Overall Comments', level=2)
@@ -225,4 +243,3 @@ Feedforward:
 
 if __name__ == "__main__":
     main()
-    

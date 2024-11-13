@@ -39,10 +39,9 @@ def call_chatgpt(prompt, model="gpt-3.5-turbo", max_tokens=3000, temperature=0.7
 def check_password():
     """Prompts the user for a password and checks it."""
     def password_entered():
-        """Checks whether a password entered by the user is correct."""
         if st.session_state["password"] == PASSWORD:
             st.session_state["password_correct"] = True
-            del st.session_state["password"]  # Remove password from session state
+            del st.session_state["password"]
         else:
             st.session_state["password_correct"] = False
 
@@ -77,7 +76,7 @@ def main():
                     return
 
                 # Ensure there is a unique identifier for criteria
-                criterion_column = 'Criterion'  # Default column name
+                criterion_column = 'Criterion'
                 if criterion_column not in original_rubric_df.columns:
                     st.error(f"Rubric must contain a '{criterion_column}' column.")
                     return
@@ -90,7 +89,6 @@ def main():
                     student_name = os.path.splitext(submission.name)[0]
                     st.header(f"Processing {student_name}'s Submission")
 
-                    # Read student submission
                     try:
                         doc = docx.Document(submission)
                         student_text = '\n'.join([para.text for para in doc.paragraphs])
@@ -134,8 +132,8 @@ def main():
                     if feedback:
                         st.success(f"Feedback generated for {student_name}")
 
-                        # Parse the feedback
                         try:
+                            # Check for JSON format in AI response
                             sections = feedback.split('Completed Grading Rubric (JSON):')
                             if len(sections) < 2:
                                 st.error("Failed to parse the completed grading rubric from the AI response.")
@@ -147,8 +145,14 @@ def main():
                             rubric_section, rest = rest.split('Overall Comments:', 1)
                             overall_comments_section, feedforward_section = rest.split('Feedforward:', 1)
 
-                            # Read the completed rubric JSON
+                            # Check JSON structure
                             rubric_json = rubric_section.strip()
+                            if not rubric_json.startswith("[") or not rubric_json.endswith("]"):
+                                st.error("The rubric JSON format appears invalid.")
+                                st.write("AI Response:")
+                                st.code(feedback)
+                                continue
+
                             completed_rubric_data = json.loads(rubric_json)
                             completed_rubric_df = pd.DataFrame(completed_rubric_data)
 
@@ -159,7 +163,7 @@ def main():
                                 st.code(feedback)
                                 continue
 
-                            # Get overall comments and feedforward
+                            # Extract overall comments and feedforward
                             overall_comments = overall_comments_section.strip()
                             feedforward = feedforward_section.strip()
 
@@ -170,6 +174,11 @@ def main():
                                 how='left'
                             )
 
+                        except json.JSONDecodeError:
+                            st.error("Failed to decode JSON in the AI response.")
+                            st.write("AI Response:")
+                            st.code(feedback)
+                            continue
                         except Exception as e:
                             st.error(f"Error parsing AI response: {e}")
                             st.write("AI Response:")
@@ -182,8 +191,6 @@ def main():
                         # Set the page orientation to landscape
                         section = feedback_doc.sections[0]
                         section.orientation = docx.enum.section.WD_ORIENT.LANDSCAPE
-
-                        # Adjust the page width and height
                         section.page_width, section.page_height = section.page_height, section.page_width
 
                         # Add heading for the student's feedback
@@ -205,8 +212,6 @@ def main():
                                 for i, col_name in enumerate(merged_rubric_df.columns):
                                     cell = row_cells[i]
                                     cell.text = str(row[col_name])
-
-                                    # Highlight cells in 'Score' and 'Comment' columns
                                     if col_name in ['Score', 'Comment'] and pd.notnull(row[col_name]):
                                         shading_elm = parse_xml(r'<w:shd {} w:fill="D9EAD3"/>'.format(nsdecls('w')))
                                         cell._tc.get_or_add_tcPr().append(shading_elm)
@@ -233,4 +238,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-    

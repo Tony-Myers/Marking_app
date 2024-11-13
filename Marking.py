@@ -134,8 +134,12 @@ Feedforward:
                             csv_feedback = feedback.split('Overall Comments:')[0].strip()
                             comments_section = feedback.split('Overall Comments:')[1].strip()
 
+                            # Clean and parse the CSV section
+                            csv_lines = [line for line in csv_feedback.splitlines() if line.count(',') >= 2]
+                            csv_feedback_cleaned = '\n'.join(csv_lines)
+
                             # Load the CSV section into DataFrame
-                            completed_rubric_df = pd.read_csv(StringIO(csv_feedback))
+                            completed_rubric_df = pd.read_csv(StringIO(csv_feedback_cleaned))
                             overall_comments, feedforward = comments_section.split('Feedforward:')
 
                             # Merge with original rubric if needed
@@ -187,4 +191,3 @@ Feedforward:
 
 if __name__ == "__main__":
     main()
-    

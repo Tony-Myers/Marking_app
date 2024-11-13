@@ -1,4 +1,3 @@
-
 import streamlit as st
 from openai import OpenAI
 import pandas as pd
@@ -16,7 +15,7 @@ OPENAI_API_KEY = st.secrets["openai_api_key"]
 # Instantiate the OpenAI client
 client = OpenAI(api_key=OPENAI_API_KEY)
 
-def call_chatgpt(prompt, model="gpt-4", max_tokens=3000, temperature=0.7, retries=2):
+def call_chatgpt(prompt, model="gpt-4", max_tokens=3000, temperature=0.5, retries=2):
     """Calls the OpenAI API using the client instance and returns the response as text."""
     for attempt in range(retries):
         try:
@@ -91,6 +90,10 @@ def main():
                 # Get the list of percentage range columns
                 percentage_columns = [col for col in original_rubric_df.columns if '%' in col]
 
+                # Get the list of criteria
+                criteria_list = original_rubric_df[criterion_column].tolist()
+                criteria_string = '\n'.join(criteria_list)
+
                 for submission in submissions:
                     student_name = os.path.splitext(submission.name)[0]
                     st.header(f"Processing {student_name}'s Submission")
@@ -110,9 +113,12 @@ You are an experienced educator tasked with grading a student's assignment based
 **Instructions:**
 
 - Review the student's submission thoroughly.
-- For **each criterion** in the rubric, assign a numerical score between 0 and 100 (e.g., 75) and provide a brief comment.
+- For **each criterion** in the list below, assign a numerical score between 0 and 100 (e.g., 75) and provide a brief comment.
 - Ensure that the score is numeric without any extra symbols or text.
 - The scores should reflect the student's performance according to the descriptors in the rubric.
+
+**List of Criteria:**
+{criteria_string}
 
 **Rubric (in CSV format):**
 {rubric_csv_string}
@@ -128,10 +134,13 @@ You are an experienced educator tasked with grading a student's assignment based
 Please output your feedback in the exact format below, ensuring you include **all criteria**:
 
 
+**Important Notes:**
 
-- Replace "Criterion 1", "Score 1", and "Comment 1" with the actual criterion, score, and comment.
-- Ensure there are no extra lines or missing lines.
-- Do not include any additional text outside of the specified format.
+- **Ensure that 'Overall Comments:' and 'Feedforward:' are included exactly as shown, with the colon and on separate lines.**
+- **Do not include any additional text outside of the specified format.**
+- **Do not omit any sections.**
+- **Do not use markdown or bullet points in the CSV section.**
+
 """
 
                     # Call ChatGPT API
@@ -145,13 +154,19 @@ Please output your feedback in the exact format below, ensuring you include **al
                         # Parse the feedback
                         try:
                             # Split the feedback into CSV and comments sections
-                            csv_feedback = feedback.split('Overall Comments:')[0].strip()
-                            comments_section = 'Overall Comments:' + feedback.split('Overall Comments:')[1].strip()
+                            if 'Overall Comments:' in feedback:
+                                csv_feedback = feedback.split('Overall Comments:', 1)[0].strip()
+                                comments_section = feedback.split('Overall Comments:', 1)[1].strip()
+                            else:
+                                st.error("The AI's response is missing 'Overall Comments:'. Please adjust the prompt or try again.")
+                                st.write("AI Response:")
+                                st.code(feedback)
+                                continue
 
                             csv_feedback_cleaned = parse_csv_section(csv_feedback)
 
                             # Load the cleaned CSV section into DataFrame
-                            completed_rubric_df = pd.read_csv(StringIO(csv_feedback_cleaned), dtype={criterion_column: str})
+                            completed_rubric_df = pd.read_csv(StringIO(csv_feedback_cleaned), dtype={criterion_column: str, 'Score': float})
 
                             # Ensure all criteria are present
                             missing_criteria = set(original_rubric_df[criterion_column]) - set(completed_rubric_df[criterion_column])
@@ -161,11 +176,13 @@ Please output your feedback in the exact format below, ensuring you include **al
                             # Extract overall comments and feedforward
                             overall_comments = ''
                             feedforward = ''
-                            if 'Overall Comments:' in comments_section and 'Feedforward:' in comments_section:
-                                overall_comments = comments_section.split('Overall Comments:')[1].split('Feedforward:')[0].strip()
-                                feedforward = comments_section.split('Feedforward:')[1].strip()
+                            if 'Feedforward:' in comments_section:
+                                overall_comments = comments_section.split('Feedforward:', 1)[0].strip()
+                                feedforward = comments_section.split('Feedforward:', 1)[1].strip()
                             else:
-                                st.warning("Could not parse Overall Comments and Feedforward sections.")
+                                st.warning("The AI's response is missing 'Feedforward:'. Please adjust the prompt or try again.")
+                                overall_comments = comments_section.strip()
+                                feedforward = ''
 
                             # Merge the dataframes with specified suffixes
                             merged_rubric_df = original_rubric_df.merge(

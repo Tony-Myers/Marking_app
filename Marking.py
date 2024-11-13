@@ -15,7 +15,7 @@ OPENAI_API_KEY = st.secrets["openai_api_key"]
 # Instantiate the OpenAI client
 client = OpenAI(api_key=OPENAI_API_KEY)
 
-def call_chatgpt(prompt, model="gpt-4", max_tokens=3000, temperature=0.5, retries=2):
+def call_chatgpt(prompt, model="gpt-4", max_tokens=3000, temperature=0.3, retries=2):
     """Calls the OpenAI API using the client instance and returns the response as text."""
     for attempt in range(retries):
         try:
@@ -136,15 +136,19 @@ Please output your feedback in the exact format below, ensuring you include **al
 
 **Important Notes:**
 
-- **Ensure that 'Overall Comments:' and 'Feedforward:' are included exactly as shown, with the colon and on separate lines.**
-- **Do not include any additional text outside of the specified format.**
-- **Do not omit any sections.**
-- **Do not use markdown or bullet points in the CSV section.**
+- **Begin your response with the CSV section**, starting with "Criterion,Score,Comment".
+- **Include all criteria** from the list provided.
+- **Do not omit any sections**.
+- **Do not include any additional text** or formatting outside of the specified format.
+- **Ensure that 'Overall Comments:' and 'Feedforward:' are included exactly as shown**, with the colon and on separate lines.
+- **Do not use markdown formatting** like bold, italics, or headers.
+- **Ensure there are no extra lines or missing lines**.
+- **Your entire response should be in plain text**.
 
 """
 
                     # Call ChatGPT API
-                    feedback = call_chatgpt(prompt, max_tokens=3000)
+                    feedback = call_chatgpt(prompt, max_tokens=3000, temperature=0.3)
                     if feedback:
                         st.success(f"Feedback generated for {student_name}")
 
@@ -153,8 +157,9 @@ Please output your feedback in the exact format below, ensuring you include **al
 
                         # Parse the feedback
                         try:
-                            # Split the feedback into CSV and comments sections
+                            # Check if 'Overall Comments:' is in the feedback
                             if 'Overall Comments:' in feedback:
+                                # Split the feedback into CSV and comments sections
                                 csv_feedback = feedback.split('Overall Comments:', 1)[0].strip()
                                 comments_section = feedback.split('Overall Comments:', 1)[1].strip()
                             else:
@@ -163,7 +168,14 @@ Please output your feedback in the exact format below, ensuring you include **al
                                 st.code(feedback)
                                 continue
 
-                            csv_feedback_cleaned = parse_csv_section(csv_feedback)
+                            # Check if the CSV section is present
+                            if 'Criterion,Score,Comment' in csv_feedback:
+                                csv_feedback_cleaned = parse_csv_section(csv_feedback)
+                            else:
+                                st.error("The AI's response is missing the CSV section with 'Criterion,Score,Comment'. Please adjust the prompt or try again.")
+                                st.write("AI Response:")
+                                st.code(feedback)
+                                continue
 
                             # Load the cleaned CSV section into DataFrame
                             completed_rubric_df = pd.read_csv(StringIO(csv_feedback_cleaned), dtype={criterion_column: str, 'Score': float})

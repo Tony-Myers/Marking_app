@@ -2,8 +2,11 @@ import streamlit as st
 from openai import OpenAI
 import pandas as pd
 import docx
+from docx.oxml.ns import nsdecls
+from docx.oxml import parse_xml
 import os
 from io import BytesIO
+import io
 
 # Set your OpenAI API key from secrets
 PASSWORD = st.secrets["password"]
@@ -65,28 +68,29 @@ def main():
         submissions = st.sidebar.file_uploader("Upload Student Submissions (.docx)", type=['docx'], accept_multiple_files=True)
 
         if rubric_file and submissions:
-            # Read the grading rubric
-            try:
-                rubric_df = pd.read_csv(rubric_file)
-            except Exception as e:
-                st.error(f"Error reading rubric: {e}")
-                return
-
-            # Process each submission
-            for submission in submissions:
-                student_name = os.path.splitext(submission.name)[0]
-                st.header(f"Processing {student_name}'s Submission")
-
-                # Read student submission
+            if st.button("Run Marking"):
+                # Read the grading rubric
                 try:
-                    doc = docx.Document(submission)
-                    student_text = '\n'.join([para.text for para in doc.paragraphs])
+                    rubric_df = pd.read_csv(rubric_file)
                 except Exception as e:
-                    st.error(f"Error reading submission {submission.name}: {e}")
-                    continue
+                    st.error(f"Error reading rubric: {e}")
+                    return
 
-                # Prepare prompt for ChatGPT
-                prompt = f"""
+                # Process each submission
+                for submission in submissions:
+                    student_name = os.path.splitext(submission.name)[0]
+                    st.header(f"Processing {student_name}'s Submission")
+
+                    # Read student submission
+                    try:
+                        doc = docx.Document(submission)
+                        student_text = '\n'.join([para.text for para in doc.paragraphs])
+                    except Exception as e:
+                        st.error(f"Error reading submission {submission.name}: {e}")
+                        continue
+
+                    # Prepare prompt for ChatGPT
+                    prompt = f"""
 You are an assistant that grades student assignments based on the following rubric:
 
 {rubric_df.to_csv(index=False)}
@@ -96,35 +100,32 @@ Student's submission:
 {student_text}
 
 Provide:
-- Completed grading rubric with scores and brief comments.
+
+- Completed grading rubric with scores and brief comments, in CSV format.
+
 - Concise overall comments on the quality of the work.
+
 - Actionable 'feedforward' bullet points for future improvement.
+
+Please output in the following format:
+
+Completed Grading Rubric (CSV):
+[CSV data]
+
+Overall Comments:
+[Text]
+
+Feedforward:
+[Bullet points]
 """
 
-                # Call ChatGPT API
-                feedback = call_chatgpt(prompt)
-                if feedback:
-                    st.success(f"Feedback generated for {student_name}")
+                    # Call ChatGPT API
+                    feedback = call_chatgpt(prompt)
+                    if feedback:
+                        st.success(f"Feedback generated for {student_name}")
 
-                    # Create a Word document for the feedback
-                    feedback_doc = docx.Document()
-                    feedback_doc.add_heading(f"Feedback for {student_name}", level=1)
-                    feedback_doc.add_paragraph(feedback)
-
-                    # Save the feedback document to a buffer
-                    buffer = BytesIO()
-                    feedback_doc.save(buffer)
-                    buffer.seek(0)
-
-                    # Provide download link
-                    st.download_button(
-                        label=f"Download Feedback for {student_name}",
-                        data=buffer,
-                        file_name=f"{student_name}_feedback.docx",
-                        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                    )
-                else:
-                    st.error(f"Failed to generate feedback for {student_name}")
-
-if __name__ == "__main__":
-    main()
+                        # Parse the feedback
+                        try:
+                            # Split the feedback into sections
+                            sections = feedback.split('Completed Grading Rubric (CSV):')
+                 

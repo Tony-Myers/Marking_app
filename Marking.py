@@ -15,7 +15,7 @@ OPENAI_API_KEY = st.secrets["openai_api_key"]
 # Instantiate the OpenAI client
 client = OpenAI(api_key=OPENAI_API_KEY)
 
-def call_chatgpt(prompt, model="gpt-4o", max_tokens=1500, temperature=0.7, retries=2):
+def call_chatgpt(prompt, model="gpt-3.5-turbo", max_tokens=2000, temperature=0.7, retries=2):
     """Calls the OpenAI API using the client instance and returns the response as text."""
     for attempt in range(retries):
         try:
@@ -66,6 +66,7 @@ def main():
         st.sidebar.header("Upload Files")
         rubric_file = st.sidebar.file_uploader("Upload Grading Rubric (CSV)", type=['csv'])
         submissions = st.sidebar.file_uploader("Upload Student Submissions (.docx)", type=['docx'], accept_multiple_files=True)
+        assignment_task = st.sidebar.text_area("Enter Assignment Task (Optional)")
 
         if rubric_file and submissions:
             if st.button("Run Marking"):
@@ -103,6 +104,10 @@ You are an assistant that grades student assignments based on the following rubr
 
 {rubric_csv_string}
 
+Assignment Task:
+
+{assignment_task}
+
 Student's submission:
 
 {student_text}
@@ -128,7 +133,7 @@ Feedforward:
 """
 
                     # Call ChatGPT API
-                    feedback = call_chatgpt(prompt, max_tokens=1500)
+                    feedback = call_chatgpt(prompt, max_tokens=2000)
                     if feedback:
                         st.success(f"Feedback generated for {student_name}")
 
@@ -179,12 +184,12 @@ Feedforward:
                             # Add data rows
                             for index, row in merged_rubric_df.iterrows():
                                 row_cells = table.add_row().cells
-                                for i, cell in enumerate(row_cells):
-                                    cell.text = str(row[i])
+                                for i, col_name in enumerate(merged_rubric_df.columns):
+                                    cell = row_cells[i]
+                                    cell.text = str(row[col_name])
 
-                                # Highlight rows where 'Score' is not null
-                                if not pd.isnull(row['Score']):
-                                    for cell in row_cells:
+                                    # Highlight cells in 'Score' and 'Comment' columns where there is data
+                                    if col_name in ['Score', 'Comment'] and not pd.isnull(row[col_name]):
                                         shading_elm = parse_xml(r'<w:shd {} w:fill="D9EAD3"/>'.format(nsdecls('w')))
                                         cell._tc.get_or_add_tcPr().append(shading_elm)
 

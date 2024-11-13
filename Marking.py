@@ -14,7 +14,7 @@ OPENAI_API_KEY = st.secrets["openai_api_key"]
 # Instantiate the OpenAI client
 client = OpenAI(api_key=OPENAI_API_KEY)
 
-def call_chatgpt(prompt, model="gpt-3.5-turbo", max_tokens=3000, temperature=0.7, retries=2):
+def call_chatgpt(prompt, model="gpt-4o", max_tokens=3000, temperature=0.7, retries=2):
     """Calls the OpenAI API using the client instance and returns the response as text."""
     for attempt in range(retries):
         try:
@@ -134,8 +134,14 @@ Feedforward:
                             csv_feedback = feedback.split('Overall Comments:')[0].strip()
                             comments_section = feedback.split('Overall Comments:')[1].strip()
 
-                            # Clean and parse the CSV section
-                            csv_lines = [line for line in csv_feedback.splitlines() if line.count(',') >= 2]
+                            # Clean and ensure lines have exactly three fields
+                            csv_lines = []
+                            for line in csv_feedback.splitlines():
+                                if line.count(',') >= 2:
+                                    fields = line.split(',', 2)  # Limit to 3 fields
+                                    if len(fields) == 3:
+                                        csv_lines.append(','.join(fields))
+
                             csv_feedback_cleaned = '\n'.join(csv_lines)
 
                             # Load the CSV section into DataFrame
@@ -191,3 +197,4 @@ Feedforward:
 
 if __name__ == "__main__":
     main()
+    

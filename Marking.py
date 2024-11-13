@@ -14,7 +14,7 @@ OPENAI_API_KEY = st.secrets["openai_api_key"]
 # Instantiate the OpenAI client
 client = OpenAI(api_key=OPENAI_API_KEY)
 
-def call_chatgpt(prompt, model="gpt-4o", max_tokens=3000, temperature=0.7, retries=2):
+def call_chatgpt(prompt, model="gpt-3.5-turbo", max_tokens=3000, temperature=0.7, retries=2):
     """Calls the OpenAI API using the client instance and returns the response as text."""
     for attempt in range(retries):
         try:
@@ -76,6 +76,9 @@ def main():
 
         if rubric_file and submissions:
             if st.button("Run Marking"):
+                # Define the column name for criterion before usage
+                criterion_column = 'Criterion'
+
                 # Read the grading rubric
                 try:
                     original_rubric_df = pd.read_csv(rubric_file, dtype={criterion_column: str})
@@ -83,7 +86,6 @@ def main():
                     st.error(f"Error reading rubric: {e}")
                     return
 
-                criterion_column = 'Criterion'  # Default column name
                 if criterion_column not in original_rubric_df.columns:
                     st.error(f"Rubric must contain a '{criterion_column}' column.")
                     return

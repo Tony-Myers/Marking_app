@@ -128,4 +128,71 @@ Feedforward:
                         try:
                             # Split the feedback into sections
                             sections = feedback.split('Completed Grading Rubric (CSV):')
-                 
+                            if len(sections) < 2:
+                                st.error("Failed to parse the completed grading rubric from the AI response.")
+                                continue
+                            rest = sections[1]
+                            rubric_section, rest = rest.split('Overall Comments:', 1)
+                            overall_comments_section, feedforward_section = rest.split('Feedforward:', 1)
+
+                            # Read the rubric CSV
+                            rubric_csv = io.StringIO(rubric_section.strip())
+                            completed_rubric_df = pd.read_csv(rubric_csv)
+
+                            # Get overall comments and feedforward
+                            overall_comments = overall_comments_section.strip()
+                            feedforward = feedforward_section.strip()
+
+                        except Exception as e:
+                            st.error(f"Error parsing AI response: {e}")
+                            continue
+
+                        # Create a Word document for the feedback
+                        feedback_doc = docx.Document()
+                        feedback_doc.add_heading(f"Feedback for {student_name}", level=1)
+
+                        # Add the completed rubric as a table
+                        if not completed_rubric_df.empty:
+                            table = feedback_doc.add_table(rows=1, cols=len(completed_rubric_df.columns))
+                            table.style = 'Table Grid'
+
+                            # Add header row
+                            hdr_cells = table.rows[0].cells
+                            for i, column in enumerate(completed_rubric_df.columns):
+                                hdr_cells[i].text = column
+
+                            # Add data rows
+                            for index, row in completed_rubric_df.iterrows():
+                                row_cells = table.add_row().cells
+                                for i, cell in enumerate(row_cells):
+                                    cell.text = str(row[i])
+
+                                    # Apply green shading to the cell
+                                    shading_elm = parse_xml(r'<w:shd {} w:fill="D9EAD3"/>'.format(nsdecls('w')))
+                                    cell._tc.get_or_add_tcPr().append(shading_elm)
+
+                        # Add overall comments
+                        feedback_doc.add_heading('Overall Comments', level=2)
+                        feedback_doc.add_paragraph(overall_comments)
+
+                        # Add feedforward
+                        feedback_doc.add_heading('Feedforward', level=2)
+                        feedback_doc.add_paragraph(feedforward)
+
+                        # Save the feedback document to a buffer
+                        buffer = BytesIO()
+                        feedback_doc.save(buffer)
+                        buffer.seek(0)
+
+                        # Provide download link
+                        st.download_button(
+                            label=f"Download Feedback for {student_name}",
+                            data=buffer,
+                            file_name=f"{student_name}_feedback.docx",
+                            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                        )
+                    else:
+                        st.error(f"Failed to generate feedback for {student_name}")
+
+if __name__ == "__main__":
+    main()

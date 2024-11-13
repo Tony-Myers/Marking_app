@@ -2,4 +2,3 @@ streamlit
 openai
 pandas
 python-docx
-json

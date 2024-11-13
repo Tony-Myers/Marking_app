@@ -25,6 +25,7 @@ except KeyError:
 
 MAX_TOKENS = 6000  # Maximum tokens for GPT-4
 PROMPT_BUFFER = 1000  # Buffer to ensure we don't exceed the limit
+
 def count_tokens(text, encoding):
     """Counts the number of tokens in a given text."""
     return len(encoding.encode(text))
@@ -100,6 +101,7 @@ def initialize_session_state():
     """Initializes session state for storing feedback."""
     if 'feedbacks' not in st.session_state:
         st.session_state['feedbacks'] = {}
+
 def main():
     initialize_session_state()
     
@@ -215,7 +217,7 @@ Please output your feedback in the exact format below, ensuring you include **al
 - **Ensure British English spelling is used.**
 - **Overall Comments should not exceed 150 words.**
 - **Feedforward should be a bulleted list within 150 words.**
-- **Comments on each criterion should be concise and in the second person, not exceeding 400 words in total.**
+- **Comments on each criterion should be concise, in the second person, and not exceed 200 words in total.**
 - **Ensure that all fields containing commas are enclosed in double quotes.**
 - **Provide an example of the expected CSV format below.**
 
@@ -320,9 +322,9 @@ Feedforward:
                             st.code(feedback)
                             continue
 
-                st.success("All submissions have been processed.")
+            st.success("All submissions have been processed.")
 
-        # After processing, display the feedbacks and download buttons
+    # After processing, display the feedbacks and download buttons
             if st.session_state.get('feedbacks'):
                 st.header("Generated Feedbacks")
                 for student_name, feedback_data in st.session_state['feedbacks'].items():
@@ -332,9 +334,10 @@ Feedforward:
                     overall_comments = feedback_data['overall_comments']
                     feedforward = feedback_data['feedforward']
 
-                    # Display the merged rubric dataframe
-                    st.write("Rubric Scores and Comments:")
-                    st.dataframe(merged_rubric_df)
+                    # Display the merged rubric dataframe without the 'Comment' column
+                    st.write("Rubric Scores:")
+                    display_df = merged_rubric_df[['Criterion', 'Score']]
+                    st.dataframe(display_df)
 
                     # Create Word document for feedback
                     feedback_doc = docx.Document()
@@ -407,3 +410,4 @@ Feedforward:
 
 if __name__ == "__main__":
     main()
+

@@ -7,7 +7,6 @@ from docx.oxml import parse_xml
 import os
 import json
 from io import BytesIO
-import io
 
 # Set your OpenAI API key and password from secrets
 PASSWORD = st.secrets["password"]
@@ -185,6 +184,17 @@ Feedforward:
 
                         # Create a Word document for the feedback
                         feedback_doc = docx.Document()
+
+                        # Set the page orientation to landscape
+                        section = feedback_doc.sections[0]
+                        section.orientation = docx.enum.section.WD_ORIENT.LANDSCAPE
+
+                        # Adjust the page width and height to match the landscape layout
+                        new_width, new_height = section.page_height, section.page_width
+                        section.page_width = new_width
+                        section.page_height = new_height
+
+                        # Add heading for the student's feedback
                         feedback_doc.add_heading(f"Feedback for {student_name}", level=1)
 
                         # Add the full rubric as a table
@@ -217,7 +227,7 @@ Feedforward:
                         feedback_doc.add_heading('Feedforward', level=2)
                         feedback_doc.add_paragraph(feedforward)
 
-                        # Save the feedback document to a buffer
+                        # Save the feedback document to a buffer for download
                         buffer = BytesIO()
                         feedback_doc.save(buffer)
                         buffer.seek(0)
@@ -234,4 +244,3 @@ Feedforward:
 
 if __name__ == "__main__":
     main()
-    

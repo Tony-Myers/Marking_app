@@ -25,7 +25,6 @@ except KeyError:
 
 MAX_TOKENS = 6000  # Maximum tokens for GPT-4
 PROMPT_BUFFER = 1000  # Buffer to ensure we don't exceed the limit
-
 def count_tokens(text, encoding):
     """Counts the number of tokens in a given text."""
     return len(encoding.encode(text))
@@ -38,7 +37,7 @@ def truncate_text(text, max_tokens, encoding):
         return encoding.decode(truncated_tokens)
     return text
 
-def call_chatgpt(prompt, model="gpt-4o", max_tokens=3000, temperature=0.3, retries=2):
+def call_chatgpt(prompt, model="gpt-40", max_tokens=3000, temperature=0.3, retries=2):
     """Calls the OpenAI API using the client instance and returns the response as text."""
     for attempt in range(retries):
         try:
@@ -101,7 +100,6 @@ def initialize_session_state():
     """Initializes session state for storing feedback."""
     if 'feedbacks' not in st.session_state:
         st.session_state['feedbacks'] = {}
-
 def main():
     initialize_session_state()
     
@@ -218,7 +216,20 @@ Please output your feedback in the exact format below, ensuring you include **al
 - **Overall Comments should not exceed 150 words.**
 - **Feedforward should be a bulleted list within 150 words.**
 - **Comments on each criterion should be concise and in the second person, not exceeding 400 words in total.**
-- **Ensure that any fields containing commas are properly quoted.**
+- **Ensure that all fields containing commas are enclosed in double quotes.**
+- **Provide an example of the expected CSV format below.**
+
+**Example:**
+
+Overall Comments:
+Your essay provides a solid foundation in linking Functionalism and Critical Theory to the issue of racism in football. While you demonstrate a good understanding of the theories, the analysis could be more critical and less descriptive. The structure of your essay is generally clear, but some sections could benefit from improved coherence and flow. Your referencing style is mostly consistent with the 'Cite them Right' guidelines, but ensure all sources are correctly formatted and cited.
+
+Feedforward:
+- Focus on making explicit connections between theory and issue to strengthen your analysis.
+- Aim for a more critical application of theory, moving beyond description to provide deeper insights.
+- Enhance the structure by ensuring each paragraph has a clear topic sentence and logical progression.
+- Review 'Cite them Right' guidelines to ensure all references are correctly formatted.
+- Consider using more varied sources to support your arguments and provide a broader perspective.
 """
 
                     # Estimate total tokens

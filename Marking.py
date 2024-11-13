@@ -10,11 +10,13 @@ PASSWORD = st.secrets["password"]
 OPENAI_API_KEY = st.secrets["openai_api_key"]
 openai.api_key = OPENAI_API_KEY  # Set the OpenAI API key
 
+    except Exception as e:
+        return f"An error occurred in generate_response: {str(e)}"
 def call_chatgpt(prompt, model="gpt-4o", max_tokens=500, temperature=0.7, retries=2):
     """Calls the OpenAI API and returns the response as text."""
     for attempt in range(retries):
         try:
-            response = openai.ChatCompletion.create(
+            rresponse = client.chat.completions.create(
                 model=model,
                 messages=[
                     {"role": "user", "content": prompt}

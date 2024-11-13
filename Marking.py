@@ -23,7 +23,7 @@ try:
 except KeyError:
     encoding = tiktoken.get_encoding("cl100k_base")
 
-MAX_TOKENS = 6000  # Maximum tokens for GPT-4
+MAX_TOKENS = 7000  # Maximum tokens for GPT-4
 PROMPT_BUFFER = 1000  # Buffer to ensure we don't exceed the limit
 
 def count_tokens(text, encoding):
@@ -306,7 +306,8 @@ Feedforward:
                             st.session_state['feedbacks'][student_name] = {
                                 'merged_rubric_df': merged_rubric_df,
                                 'overall_comments': overall_comments,
-                                'feedforward': feedforward
+                                'feedforward': feedforward,
+                                'percentage_columns': percentage_columns  # Store percentage_columns here
                             }
 
                             # Optionally, display DataFrames for debugging
@@ -324,20 +325,11 @@ Feedforward:
 
             st.success("All submissions have been processed.")
 
-    # After processing, display the feedbacks and download buttons
+        # After processing, provide download buttons without displaying any feedback
             if st.session_state.get('feedbacks'):
                 st.header("Generated Feedbacks")
                 for student_name, feedback_data in st.session_state['feedbacks'].items():
-                    st.subheader(f"Feedback for {student_name}")
-
-                    merged_rubric_df = feedback_data['merged_rubric_df']
-                    overall_comments = feedback_data['overall_comments']
-                    feedforward = feedback_data['feedforward']
-
-                    # Display the merged rubric dataframe without the 'Comment' column
-                    st.write("Rubric Scores:")
-                    display_df = merged_rubric_df[['Criterion', 'Score']]
-                    st.dataframe(display_df)
+                    # No display of rubric scores or comments in the app
 
                     # Create Word document for feedback
                     feedback_doc = docx.Document()
@@ -351,9 +343,9 @@ Feedforward:
 
                     feedback_doc.add_heading(f"Feedback for {student_name}", level=1)
 
-                    if not merged_rubric_df.empty:
+                    if not feedback_data['merged_rubric_df'].empty:
                         # Prepare columns for the Word table
-                        table_columns = [criterion_column] + percentage_columns + ['Score', 'Comment']
+                        table_columns = [criterion_column] + feedback_data['percentage_columns'] + ['Score', 'Comment']
                         table = feedback_doc.add_table(rows=1, cols=len(table_columns))
                         table.style = 'Table Grid'
                         hdr_cells = table.rows[0].cells
@@ -361,7 +353,7 @@ Feedforward:
                             hdr_cells[i].text = str(column)
 
                         # Add data rows and apply shading to the appropriate descriptor cell
-                        for _, row in merged_rubric_df.iterrows():
+                        for _, row in feedback_data['merged_rubric_df'].iterrows():
                             row_cells = table.add_row().cells
                             score = row['Score']
                             for i, col_name in enumerate(table_columns):
@@ -370,7 +362,7 @@ Feedforward:
                                 cell.text = cell_text
 
                                 # Apply shading to the descriptor cell matching the score range
-                                if col_name in percentage_columns and pd.notnull(score):
+                                if col_name in feedback_data['percentage_columns'] and pd.notnull(score):
                                     # Extract numeric values from the percentage range
                                     range_text = col_name.replace('%', '').strip()
                                     lower_upper = range_text.split('-')
@@ -392,9 +384,9 @@ Feedforward:
 
                     # Add overall comments and feedforward
                     feedback_doc.add_heading('Overall Comments', level=2)
-                    feedback_doc.add_paragraph(overall_comments.strip())
+                    feedback_doc.add_paragraph(feedback_data['overall_comments'].strip())
                     feedback_doc.add_heading('Feedforward', level=2)
-                    feedback_doc.add_paragraph(feedforward.strip())
+                    feedback_doc.add_paragraph(feedback_data['feedforward'].strip())
 
                     buffer = BytesIO()
                     feedback_doc.save(buffer)
@@ -410,3 +402,4 @@ Feedforward:
 
 if __name__ == "__main__":
     main()
+

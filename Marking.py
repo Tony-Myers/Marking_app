@@ -127,7 +127,7 @@ def main():
                     Your responsibilities:
 
                     - Provide a completed grading rubric with scores and brief comments for each criterion, in JSON format, matching the rubric provided.
-                    - Ensure that the JSON includes the keys '{criterion_column}', 'Score', and 'Comment' for each criterion.
+                    - Ensure that the JSON includes the keys 'Criterion', 'Score', and 'Comment' for each criterion.
                     - Write concise overall comments on the quality of the work, using language directly addressing the student.
                     - List actionable 'feedforward' bullet points for future improvement, also using direct language.
 
@@ -236,5 +236,21 @@ def main():
                         # Add feedforward
                         feedback_doc.add_heading('Feedforward', level=2)
                         feedback_doc.add_paragraph(feedforward)
-
+                        
                         # Save the feedback document to a buffer for download
+                        buffer = BytesIO()
+                        feedback_doc.save(buffer)
+                        buffer.seek(0)
+
+                        # Provide download link
+                        st.download_button(
+                            label=f"Download Feedback for {student_name}",
+                            data=buffer,
+                            file_name=f"{student_name}_feedback.docx",
+                            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                        )
+                    else:
+                        st.error(f"Failed to generate feedback for {student_name}")
+
+if __name__ == "__main__":
+    main()

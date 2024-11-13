@@ -37,7 +37,7 @@ def truncate_text(text, max_tokens, encoding):
         return encoding.decode(truncated_tokens)
     return text
 
-def call_chatgpt(prompt, model="gpt-40", max_tokens=3000, temperature=0.3, retries=2):
+def call_chatgpt(prompt, model="gpt-4o", max_tokens=3000, temperature=0.3, retries=2):
     """Calls the OpenAI API using the client instance and returns the response as text."""
     for attempt in range(retries):
         try:

@@ -1,3 +1,4 @@
+
 import streamlit as st
 from openai import OpenAI
 import pandas as pd
@@ -217,5 +218,5 @@ Feedforward:
                     else:
                         st.error(f"Failed to generate feedback for {student_name}")
 
-    if __name__ == "__main__":
-        main()
+if __name__ == "__main__":
+    main()

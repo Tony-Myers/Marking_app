@@ -7,6 +7,7 @@ from docx.oxml.ns import nsdecls
 from docx.oxml import parse_xml
 import os
 from io import BytesIO, StringIO
+import tiktoken
 
 # Set your OpenAI API key and password from secrets
 PASSWORD = st.secrets["password"]
@@ -15,7 +16,28 @@ OPENAI_API_KEY = st.secrets["openai_api_key"]
 # Instantiate the OpenAI client
 client = OpenAI(api_key=OPENAI_API_KEY)
 
-def call_chatgpt(prompt, model="gpt-4", max_tokens=3000, temperature=0.3, retries=2):
+# Initialize the tiktoken encoder for GPT-4
+try:
+    encoding = tiktoken.encoding_for_model("gpt-4")
+except KeyError:
+    encoding = tiktoken.get_encoding("cl100k_base")
+
+MAX_TOKENS = 5000  # Maximum tokens for GPT-4
+PROMPT_BUFFER = 1000  # Buffer to ensure we don't exceed the limit
+
+def count_tokens(text, encoding):
+    """Counts the number of tokens in a given text."""
+    return len(encoding.encode(text))
+
+def truncate_text(text, max_tokens, encoding):
+    """Truncates text to fit within max_tokens."""
+    tokens = encoding.encode(text)
+    if len(tokens) > max_tokens:
+        truncated_tokens = tokens[:max_tokens]
+        return encoding.decode(truncated_tokens)
+    return text
+
+def call_chatgpt(prompt, model="gpt-4o", max_tokens=3000, temperature=0.3, retries=2):
     """Calls the OpenAI API using the client instance and returns the response as text."""
     for attempt in range(retries):
         try:
@@ -56,6 +78,16 @@ def parse_csv_section(csv_text):
     """Parses a CSV section line by line."""
     return csv_text.strip()
 
+def summarize_text(text):
+    """Summarizes the given text using OpenAI API."""
+    summary_prompt = f"""
+You are an assistant that summarizes academic papers. Please provide a concise summary (max 500 words) of the following text:
+
+{text}
+"""
+    summary = call_chatgpt(summary_prompt, max_tokens=800, temperature=0.3)
+    return summary if summary else text  # Fallback to original text if summarization fails
+
 def initialize_session_state():
     """Initializes session state for storing feedback."""
     if 'feedbacks' not in st.session_state:
@@ -68,7 +100,7 @@ def main():
         st.title("🔐 Automated Assignment Grading and Feedback")
 
         st.header("Assignment Task")
-        assignment_task = st.text_area("Enter the Assignment Task or Instructions (Optional)")
+        assignment_task = st.text_area("Enter the Assignment Task or Instructions (Optional)", height=150)
 
         st.header("Upload Files")
         rubric_file = st.file_uploader("Upload Grading Rubric (CSV)", type=['csv'])
@@ -119,6 +151,21 @@ def main():
                         st.error(f"Error reading submission {submission.name}: {e}")
                         continue
 
+                    # Summarize the student submission if it's too long
+                    student_tokens = count_tokens(student_text, encoding)
+                    max_submission_tokens = MAX_TOKENS - PROMPT_BUFFER  # Reserve tokens for prompt and other texts
+
+                    if student_tokens > (MAX_TOKENS * 0.6):  # If submission is more than ~4k tokens
+                        st.info(f"Summarizing {student_name}'s submission to reduce token count.")
+                        student_text = summarize_text(student_text)
+                        if not student_text:
+                            st.error(f"Failed to summarize submission for {student_name}.")
+                            continue
+
+                    # Recalculate tokens after summarization
+                    student_tokens = count_tokens(student_text, encoding)
+
+                    # Prepare prompt for ChatGPT with modifications
                     prompt = f"""
 You are an experienced educator tasked with grading a student's assignment based on the provided rubric and assignment instructions. Please ensure that your feedback adheres to UK Higher Education standards for undergraduate work. Use British English spelling throughout your feedback.
 
@@ -130,23 +177,6 @@ You are an experienced educator tasked with grading a student's assignment based
 - The scores should reflect the student's performance according to the descriptors in the rubric.
 - **Be strict in your grading to align with UK undergraduate standards.**
 - **Assess the quality of writing and referencing style, ensuring adherence to the 'Cite them Right' guidelines (2008, Pear Tree Books). Provide a brief comment on these aspects in the overall comments.**
-
-**List of Criteria:**
-{criteria_string}
-
-**Rubric (in CSV format):**
-{rubric_csv_string}
-
-**Assignment Task:**
-{assignment_task}
-
-**Student's Submission:**
-{student_text}
-
-**Your Output Format:**
-
-Please provide your feedback in the following format:
-
 
 **List of Criteria:**
 {criteria_string}
@@ -176,10 +206,22 @@ Please output your feedback in the exact format below, ensuring you include **al
 - **Your entire response should be in plain text**.
 - **Use second person narrative ("You...") in Overall Comments and Feedforward.**
 - **Ensure British English spelling is used.**
+- **Overall Comments should not exceed 150 words.**
+- **Feedforward should be a bulleted list within 150 words.**
+- **Comments on each criterion should be concise and in the second person, not exceeding 400 words in total.**
 """
 
+                    # Estimate total tokens
+                    total_tokens = count_tokens(prompt, encoding)
+                    if total_tokens > MAX_TOKENS:
+                        st.error(f"The prompt for {student_name} exceeds the maximum token limit. Please reduce the length of the rubric, assignment instructions, or the student submission.")
+                        continue
+
+                    # Calculate max tokens for response
+                    max_response_tokens = MAX_TOKENS - total_tokens
+
                     # Call ChatGPT API
-                    feedback = call_chatgpt(prompt, max_tokens=3000, temperature=0.3)
+                    feedback = call_chatgpt(prompt, max_tokens=max_response_tokens, temperature=0.3)
                     if feedback:
                         st.success(f"Feedback generated for {student_name}")
 
@@ -342,4 +384,3 @@ Please output your feedback in the exact format below, ensuring you include **al
 
 if __name__ == "__main__":
     main()
-    

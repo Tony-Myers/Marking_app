@@ -1,7 +1,9 @@
+
 import streamlit as st
 from openai import OpenAI
 import pandas as pd
 import docx
+from docx.enum.section import WD_ORIENT
 from docx.oxml.ns import nsdecls
 from docx.oxml import parse_xml
 import os
@@ -14,7 +16,7 @@ OPENAI_API_KEY = st.secrets["openai_api_key"]
 # Instantiate the OpenAI client
 client = OpenAI(api_key=OPENAI_API_KEY)
 
-def call_chatgpt(prompt, model="gpt-4o", max_tokens=3000, temperature=0.7, retries=2):
+def call_chatgpt(prompt, model="gpt-4", max_tokens=3000, temperature=0.7, retries=2):
     """Calls the OpenAI API using the client instance and returns the response as text."""
     for attempt in range(retries):
         try:
@@ -26,7 +28,7 @@ def call_chatgpt(prompt, model="gpt-4o", max_tokens=3000, temperature=0.7, retri
             )
             return response.choices[0].message.content.strip()
         except Exception as e:
-            if attempt < retries - 1:
+            if attempt < retries -1:
                 continue
             else:
                 st.error(f"API Error: {e}")
@@ -52,18 +54,8 @@ def check_password():
         return True
 
 def parse_csv_section(csv_text):
-    """Parses a CSV section line by line, ensuring each line has exactly three fields."""
-    lines = []
-    for line in csv_text.strip().splitlines():
-        if line.count(",") == 2:  # Only accept lines with exactly two commas
-            fields = line.split(",", 2)
-            if len(fields) == 3:
-                lines.append(",".join(fields))
-            else:
-                st.warning(f"Skipping malformed line: {line}")
-        else:
-            st.warning(f"Skipping line with incorrect number of commas: {line}")
-    return "\n".join(lines)
+    """Parses a CSV section line by line."""
+    return csv_text.strip()
 
 def main():
     if check_password():
@@ -113,35 +105,33 @@ def main():
 
                     # Prepare prompt for ChatGPT
                     prompt = f"""
-You are an experienced educator tasked with grading student assignments based on the following rubric and assignment instructions.
+You are an experienced educator tasked with grading a student's assignment based on the provided rubric and assignment instructions.
 
-Rubric (in CSV format):
+**Instructions:**
+
+- Review the student's submission thoroughly.
+- For **each criterion** in the rubric, assign a numerical score between 0 and 100 (e.g., 75) and provide a brief comment.
+- Ensure that the score is numeric without any extra symbols or text.
+- The scores should reflect the student's performance according to the descriptors in the rubric.
+
+**Rubric (in CSV format):**
 {rubric_csv_string}
 
-Assignment Task:
+**Assignment Task:**
 {assignment_task}
 
-Student's Submission:
+**Student's Submission:**
 {student_text}
 
-Your responsibilities:
-- Provide a completed grading rubric with scores and brief comments for each criterion, in CSV format, matching the rubric provided.
-- Ensure the CSV includes the columns '{criterion_column}', 'Score', and 'Comment' for each criterion.
-- Write concise overall comments on the quality of the work.
-- List actionable 'feedforward' bullet points for future improvement.
+**Your Output Format:**
 
-Please output in the following format:
+Please output your feedback in the exact format below, ensuring you include **all criteria**:
 
-Criterion,Score,Comment
-Criterion 1,Score 1,Comment 1
-Criterion 2,Score 2,Comment 2
-... (continue for all criteria)
 
-Overall Comments:
-[Text]
 
-Feedforward:
-[Bullet points]
+- Replace "Criterion 1", "Score 1", and "Comment 1" with the actual criterion, score, and comment.
+- Ensure there are no extra lines or missing lines.
+- Do not include any additional text outside of the specified format.
 """
 
                     # Call ChatGPT API
@@ -149,18 +139,33 @@ Feedforward:
                     if feedback:
                         st.success(f"Feedback generated for {student_name}")
 
+                        # Display AI's response for debugging
+                        st.text_area("AI Response", feedback, height=300)
+
                         # Parse the feedback
                         try:
                             # Split the feedback into CSV and comments sections
                             csv_feedback = feedback.split('Overall Comments:')[0].strip()
-                            comments_section = feedback.split('Overall Comments:')[1].strip()
+                            comments_section = 'Overall Comments:' + feedback.split('Overall Comments:')[1].strip()
 
-                            # Clean and parse the CSV section
                             csv_feedback_cleaned = parse_csv_section(csv_feedback)
 
-                            # Load the cleaned CSV section into DataFrame with 'Criterion' as string type
+                            # Load the cleaned CSV section into DataFrame
                             completed_rubric_df = pd.read_csv(StringIO(csv_feedback_cleaned), dtype={criterion_column: str})
-                            overall_comments, feedforward = comments_section.split('Feedforward:')
+
+                            # Ensure all criteria are present
+                            missing_criteria = set(original_rubric_df[criterion_column]) - set(completed_rubric_df[criterion_column])
+                            if missing_criteria:
+                                st.warning(f"The AI feedback is missing the following criteria: {missing_criteria}")
+
+                            # Extract overall comments and feedforward
+                            overall_comments = ''
+                            feedforward = ''
+                            if 'Overall Comments:' in comments_section and 'Feedforward:' in comments_section:
+                                overall_comments = comments_section.split('Overall Comments:')[1].split('Feedforward:')[0].strip()
+                                feedforward = comments_section.split('Feedforward:')[1].strip()
+                            else:
+                                st.warning("Could not parse Overall Comments and Feedforward sections.")
 
                             # Merge the dataframes with specified suffixes
                             merged_rubric_df = original_rubric_df.merge(
@@ -169,6 +174,13 @@ Feedforward:
                                 how='left',
                                 suffixes=('', '_ai')  # Suffix for AI feedback columns
                             ).dropna(how="all", axis=1)
+
+                            # Display DataFrames for debugging
+                            st.write("Completed Rubric DataFrame:")
+                            st.dataframe(completed_rubric_df)
+
+                            st.write("Merged Rubric DataFrame:")
+                            st.dataframe(merged_rubric_df)
 
                         except Exception as e:
                             st.error(f"Error parsing AI response: {e}")
@@ -181,7 +193,7 @@ Feedforward:
 
                         # Set page to landscape
                         section = feedback_doc.sections[0]
-                        section.orientation = docx.enum.section.WD_ORIENT.LANDSCAPE
+                        section.orientation = WD_ORIENT.LANDSCAPE
                         new_width, new_height = section.page_height, section.page_width
                         section.page_width = new_width
                         section.page_height = new_height
@@ -216,8 +228,8 @@ Feedforward:
                                                 lower = float(lower_upper[0].strip())
                                                 upper = float(lower_upper[1].strip())
 
-                                                # Convert score to float
-                                                score_value = float(str(score).replace('%', '').strip())
+                                                # Use the score as a float
+                                                score_value = float(score)
 
                                                 if lower <= score_value <= upper:
                                                     # Apply green shading to this cell
@@ -248,4 +260,3 @@ Feedforward:
 
 if __name__ == "__main__":
     main()
-    

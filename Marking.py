@@ -141,15 +141,15 @@ def main():
 
 
                     # Call ChatGPT API
-                    feedback = call_chatgpt(prompt, max_tokens=3000)
-                    if feedback:
+    feedback = call_chatgpt(prompt, max_tokens=3000)
+            if feedback:
                         st.success(f"Feedback generated for {student_name}")
 
                         # Parse the feedback
-                        try:
+            try:
                             # Split the feedback into sections
-                            sections = feedback.split('Completed Grading Rubric (JSON):')
-                            if len(sections) < 2:
+                sections = feedback.split('Completed Grading Rubric (JSON):')
+                    if len(sections) < 2:
                                 st.error("Failed to parse the completed grading rubric from the AI response.")
                                 st.write("AI Response:")
                                 st.code(feedback)

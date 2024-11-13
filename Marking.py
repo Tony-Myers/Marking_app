@@ -9,6 +9,7 @@ import os
 from io import BytesIO, StringIO
 import tiktoken
 import csv
+import re
 
 # Set your OpenAI API key and password from secrets
 PASSWORD = st.secrets["password"]
@@ -97,6 +98,17 @@ You are an assistant that summarizes academic papers. Please provide a concise s
     summary = call_chatgpt(summary_prompt, max_tokens=800, temperature=0.3)
     return summary if summary else text  # Fallback to original text if summarization fails
 
+def extract_weight(criterion_name):
+    """
+    Extracts the weight from the criterion name.
+    For example, from "Linking Theory to Issue (15%)", it extracts 15.0
+    """
+    match = re.search(r'\((\d+)%\)', criterion_name)
+    if match:
+        return float(match.group(1))
+    else:
+        return 0.0  # Default weight if not found
+
 def initialize_session_state():
     """Initializes session state for storing feedback."""
     if 'feedbacks' not in st.session_state:
@@ -133,9 +145,15 @@ def main():
 
                 # Ensure Criterion column is string type for consistency in both dataframes
                 original_rubric_df[criterion_column] = original_rubric_df[criterion_column].astype(str)
+
+                # Extract Weight from Criterion and clean Criterion names
+                original_rubric_df['Weight'] = original_rubric_df[criterion_column].apply(extract_weight)
+                original_rubric_df[criterion_column] = original_rubric_df[criterion_column].apply(lambda x: re.sub(r'\s*\(\d+%\)', '', x))
+
+                # Generate rubric CSV string with all fields quoted
                 rubric_csv_string = original_rubric_df.to_csv(index=False, quoting=csv.QUOTE_ALL)
 
-                # Get the list of percentage range columns
+                # Get the list of percentage range columns (e.g., '0-59%', '60-69%', etc.)
                 percentage_columns = [col for col in original_rubric_df.columns if '%' in col]
 
                 # Get the list of criteria
@@ -232,7 +250,10 @@ Feedforward:
 - Enhance the structure by ensuring each paragraph has a clear topic sentence and logical progression.
 - Review 'Cite them Right' guidelines to ensure all references are correctly formatted.
 - Consider using more varied sources to support your arguments and provide a broader perspective.
-"""
+
+**Note:** Additionally, please include a **Total Mark** based on the weighted scores of each criterion. This total mark should only appear in the downloaded `.docx` file and not in the Streamlit app.
+
+                    """
 
                     # Estimate total tokens
                     total_tokens = count_tokens(prompt, encoding)
@@ -302,12 +323,17 @@ Feedforward:
                                 suffixes=('', '_ai')  # Suffix for AI feedback columns
                             ).dropna(how="all", axis=1)
 
+                            # Calculate Weighted Scores and Total Mark
+                            merged_rubric_df['Weighted_Score'] = merged_rubric_df['Weight'] * merged_rubric_df['Score'] / 100
+                            total_mark = merged_rubric_df['Weighted_Score'].sum()
+
                             # Store the feedback in session state to persist across reruns
                             st.session_state['feedbacks'][student_name] = {
                                 'merged_rubric_df': merged_rubric_df,
                                 'overall_comments': overall_comments,
                                 'feedforward': feedforward,
-                                'percentage_columns': percentage_columns  # Store percentage_columns here
+                                'percentage_columns': percentage_columns,
+                                'total_mark': total_mark  # Store total_mark here
                             }
 
                             # Optionally, display DataFrames for debugging
@@ -388,6 +414,10 @@ Feedforward:
                     feedback_doc.add_heading('Feedforward', level=2)
                     feedback_doc.add_paragraph(feedback_data['feedforward'].strip())
 
+                    # Add Total Mark
+                    feedback_doc.add_heading('Total Mark', level=2)
+                    feedback_doc.add_paragraph(f"{feedback_data['total_mark']:.2f}")
+
                     buffer = BytesIO()
                     feedback_doc.save(buffer)
                     buffer.seek(0)
@@ -402,4 +432,3 @@ Feedforward:
 
 if __name__ == "__main__":
     main()
-

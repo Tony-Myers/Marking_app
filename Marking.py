@@ -72,8 +72,8 @@ def main():
                 try:
                     original_rubric_df = pd.read_csv(rubric_file)
                     
-                    # Define required columns
-                    required_columns = ['Criterion', 'Max_Score', 'Description']
+                    # Define required columns based on rubric structure
+                    required_columns = ['Criterion', 'Max_Score']
                     
                     # Check for required columns
                     for col in required_columns:
@@ -81,9 +81,9 @@ def main():
                             st.error(f"Rubric file must contain a '{col}' column.")
                             return
                     
-                    # Ensure 'Max_Score' column is numeric
-                    if not pd.api.types.is_numeric_dtype(original_rubric_df['Max_Score']):
-                        st.error("The 'Max_Score' column must contain numeric values.")
+                    # Ensure 'Max_Score' column is numeric (if used for grading)
+                    if 'Max_Score' in original_rubric_df and not pd.api.types.is_numeric_dtype(original_rubric_df['Max_Score']):
+                        st.error("The 'Max_Score' column must contain numeric values if present.")
                         return
                     
                     # Ensure no missing values in essential columns
@@ -181,8 +181,8 @@ def main():
 
                             # Merge the original rubric with the completed rubric
                             merged_rubric_df = original_rubric_df.merge(
-                                completed_rubric_df[[criterion_column, 'Score', 'Comment']],
-                                on=criterion_column,
+                                completed_rubric_df[['Criterion', 'Score', 'Comment']],
+                                on='Criterion',
                                 how='left'
                             )
 
@@ -238,19 +238,3 @@ def main():
                         feedback_doc.add_paragraph(feedforward)
 
                         # Save the feedback document to a buffer for download
-                        buffer = BytesIO()
-                        feedback_doc.save(buffer)
-                        buffer.seek(0)
-
-                        # Provide download link
-                        st.download_button(
-                            label=f"Download Feedback for {student_name}",
-                            data=buffer,
-                            file_name=f"{student_name}_feedback.docx",
-                            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                        )
-                    else:
-                        st.error(f"Failed to generate feedback for {student_name}")
-
-if __name__ == "__main__":
-    main()

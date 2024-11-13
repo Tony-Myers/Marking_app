@@ -55,11 +55,12 @@ def parse_csv_section(csv_text):
     """Parses a CSV section line by line, ensuring each line has exactly three fields."""
     lines = []
     for line in csv_text.strip().splitlines():
-        fields = line.split(",", 2)  # Split with max 3 fields to handle extra commas in comments
-        if len(fields) == 3:
-            lines.append(",".join(fields))
-        else:
-            st.warning(f"Skipping malformed line: {line}")  # Debug output for problematic lines
+        if line.count(",") == 2:  # Only accept lines with exactly two commas
+            fields = line.split(",", 2)
+            if len(fields) == 3:
+                lines.append(",".join(fields))
+            else:
+                st.warning(f"Skipping malformed line: {line}")
     return "\n".join(lines)
 
 def main():
@@ -77,7 +78,7 @@ def main():
             if st.button("Run Marking"):
                 # Read the grading rubric
                 try:
-                    original_rubric_df = pd.read_csv(rubric_file)
+                    original_rubric_df = pd.read_csv(rubric_file, dtype={criterion_column: str})
                 except Exception as e:
                     st.error(f"Error reading rubric: {e}")
                     return
@@ -87,6 +88,8 @@ def main():
                     st.error(f"Rubric must contain a '{criterion_column}' column.")
                     return
 
+                # Ensure Criterion column is string type for consistency in both dataframes
+                original_rubric_df[criterion_column] = original_rubric_df[criterion_column].astype(str)
                 rubric_csv_string = original_rubric_df.to_csv(index=False)
 
                 for submission in submissions:
@@ -148,11 +151,11 @@ Feedforward:
                             # Clean and parse the CSV section
                             csv_feedback_cleaned = parse_csv_section(csv_feedback)
 
-                            # Load the cleaned CSV section into DataFrame
-                            completed_rubric_df = pd.read_csv(StringIO(csv_feedback_cleaned))
+                            # Load the cleaned CSV section into DataFrame with 'Criterion' as string type
+                            completed_rubric_df = pd.read_csv(StringIO(csv_feedback_cleaned), dtype={criterion_column: str})
                             overall_comments, feedforward = comments_section.split('Feedforward:')
 
-                            # Merge with original rubric if needed
+                            # Merge with original rubric ensuring both columns are strings
                             merged_rubric_df = original_rubric_df.merge(
                                 completed_rubric_df[[criterion_column, 'Score', 'Comment']],
                                 on=criterion_column,

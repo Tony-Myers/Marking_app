@@ -1,5 +1,5 @@
 import streamlit as st
-import openai
+from openai import OpenAI
 import pandas as pd
 import docx
 import os
@@ -8,23 +8,15 @@ from io import BytesIO
 # Set your OpenAI API key from secrets
 PASSWORD = st.secrets["password"]
 OPENAI_API_KEY = st.secrets["openai_api_key"]
-openai.api_key = OPENAI_API_KEY  # Set the OpenAI API key
 
-def function_name():
-    # Indent by 4 spaces inside the function
-    for item in iterable:
-        try:
-            # Code block inside try
-            pass
-        except Exception as e:
-            # Code block inside except
-            pass
+# Instantiate the OpenAI client
+client = OpenAI(api_key=OPENAI_API_KEY)
 
-def call_chatgpt(prompt, model="gpt-4o", max_tokens=500, temperature=0.7, retries=2):
-    """Calls the OpenAI API and returns the response as text."""
+def call_chatgpt(prompt, model="gpt-3.5-turbo", max_tokens=500, temperature=0.7, retries=2):
+    """Calls the OpenAI API using the client instance and returns the response as text."""
     for attempt in range(retries):
         try:
-            rresponse = client.chat.completions.create(
+            response = client.chat.completions.create(
                 model=model,
                 messages=[
                     {"role": "user", "content": prompt}
@@ -33,7 +25,7 @@ def call_chatgpt(prompt, model="gpt-4o", max_tokens=500, temperature=0.7, retrie
                 temperature=temperature,
                 stop=None
             )
-            return response['choices'][0]['message']['content'].strip()
+            return response.choices[0].message.content.strip()
         except Exception as e:
             if attempt < retries - 1:
                 continue

@@ -102,8 +102,9 @@ def main():
                         continue
 
                     # Prepare prompt for ChatGPT
-                    prompt = f"""
-You are an experienced educator tasked with grading student assignments based on the following rubric and assignment instructions.
+# Prepare prompt for ChatGPT
+prompt = f"""
+You are an experienced educator tasked with grading student assignments based on the following rubric and assignment instructions. Provide feedback directly addressing the student (e.g., "You have demonstrated...") rather than speaking about them in third person (e.g., "The student has demonstrated...").
 
 Rubric (in CSV format):
 {rubric_csv_string}
@@ -118,8 +119,8 @@ Your responsibilities:
 
 - Provide a completed grading rubric with scores and brief comments for each criterion, in JSON format, matching the rubric provided.
 - Ensure that the JSON includes the keys '{criterion_column}', 'Score', and 'Comment' for each criterion.
-- Write concise overall comments on the quality of the work.
-- List actionable 'feedforward' bullet points for future improvement.
+- Write concise overall comments on the quality of the work, using language directly addressing the student.
+- List actionable 'feedforward' bullet points for future improvement, also using direct language.
 
 Please output in the following format:
 
@@ -134,6 +135,7 @@ Overall Comments:
 Feedforward:
 [Bullet points]
 """
+
 
                     # Call ChatGPT API
                     feedback = call_chatgpt(prompt, max_tokens=3000)

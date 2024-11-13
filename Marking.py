@@ -8,11 +8,51 @@ from io import BytesIO
 # Set your OpenAI API key from secrets
 PASSWORD = st.secrets["password"]
 OPENAI_API_KEY = st.secrets["openai_api_key"]
+openai.api_key = OPENAI_API_KEY  # Set the OpenAI API key
 
+def call_chatgpt(prompt, model="gpt-4o", max_tokens=500, temperature=0.7, retries=2):
+    """Calls the OpenAI API and returns the response as text."""
+    for attempt in range(retries):
+        try:
+            response = openai.ChatCompletion.create(
+                model=model,
+                messages=[
+                    {"role": "user", "content": prompt}
+                ],
+                max_tokens=max_tokens,
+                temperature=temperature,
+                stop=None
+            )
+            return response['choices'][0]['message']['content'].strip()
+        except Exception as e:
+            if attempt < retries - 1:
+                continue
+            else:
+                st.error(f"API Error: {e}")
+                return None
 
-def call_chatgpt(prompt, model="gpt-4", max_tokens=500, temperature=0.7, retries=2):
-    # Your existing API call code
-    pass
+def check_password():
+    """Prompts the user for a password and checks it."""
+    def password_entered():
+        """Checks whether a password entered by the user is correct."""
+        if st.session_state["password"] == PASSWORD:
+            st.session_state["password_correct"] = True
+            del st.session_state["password"]  # Remove password from session state
+        else:
+            st.session_state["password_correct"] = False
+
+    if "password_correct" not in st.session_state:
+        # First run, show input for password.
+        st.text_input("Enter the password", type="password", on_change=password_entered, key="password")
+        return False
+    elif not st.session_state["password_correct"]:
+        # Password not correct, show input + error.
+        st.text_input("Enter the password", type="password", on_change=password_entered, key="password")
+        st.error("😕 Password incorrect")
+        return False
+    else:
+        # Password correct.
+        return True
 
 def main():
     if check_password():

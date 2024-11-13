@@ -387,4 +387,26 @@ Feedforward:
                                                 shading_elm = parse_xml(r'<w:shd {} w:fill="D9EAD3"/>'.format(nsdecls('w')))
                                                 cell._tc.get_or_add_tcPr().append(shading_elm)
                                         except ValueError as e:
-                                
+                                            st.warning(f"Error converting score or range to float: {e}")
+                                            continue
+
+                    # Add overall comments and feedforward
+                    feedback_doc.add_heading('Overall Comments', level=2)
+                    feedback_doc.add_paragraph(overall_comments.strip())
+                    feedback_doc.add_heading('Feedforward', level=2)
+                    feedback_doc.add_paragraph(feedforward.strip())
+
+                    buffer = BytesIO()
+                    feedback_doc.save(buffer)
+                    buffer.seek(0)
+
+                    # Provide download button for the feedback document
+                    st.download_button(
+                        label=f"Download Feedback for {student_name}",
+                        data=buffer,
+                        file_name=f"{student_name}_feedback.docx",
+                        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                    )
+
+if __name__ == "__main__":
+    main()

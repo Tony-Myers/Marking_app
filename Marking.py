@@ -63,10 +63,12 @@ def main():
     if check_password():
         st.title("🔐 Automated Assignment Grading and Feedback")
 
-        st.sidebar.header("Upload Files")
-        rubric_file = st.sidebar.file_uploader("Upload Grading Rubric (CSV)", type=['csv'])
-        submissions = st.sidebar.file_uploader("Upload Student Submissions (.docx)", type=['docx'], accept_multiple_files=True)
-        assignment_task = st.sidebar.text_area("Enter Assignment Task (Optional)")
+        st.header("Assignment Task")
+        assignment_task = st.text_area("Enter the Assignment Task or Instructions (Optional)")
+
+        st.header("Upload Files")
+        rubric_file = st.file_uploader("Upload Grading Rubric (CSV)", type=['csv'])
+        submissions = st.file_uploader("Upload Student Submissions (.docx)", type=['docx'], accept_multiple_files=True)
 
         if rubric_file and submissions:
             if st.button("Run Marking"):
@@ -100,25 +102,24 @@ def main():
 
                     # Prepare prompt for ChatGPT
                     prompt = f"""
-You are an assistant that grades student assignments based on the following rubric:
+You are an experienced educator tasked with grading student assignments based on the following rubric and assignment instructions.
 
+Rubric:
 {rubric_csv_string}
 
 Assignment Task:
-
 {assignment_task}
 
-Student's submission:
-
+Student's Submission:
 {student_text}
 
-Provide:
+Your responsibilities:
 
-- Completed grading rubric with scores and brief comments, in CSV format, matching the rubric provided.
+- Provide a completed grading rubric with scores and brief comments for each criterion, in CSV format, matching the rubric provided.
 
-- Concise overall comments on the quality of the work.
+- Write concise overall comments on the quality of the work.
 
-- Actionable 'feedforward' bullet points for future improvement.
+- List actionable 'feedforward' bullet points for future improvement.
 
 Please output in the following format:
 
@@ -216,5 +217,5 @@ Feedforward:
                     else:
                         st.error(f"Failed to generate feedback for {student_name}")
 
-if __name__ == "__main__":
-    main()
+    if __name__ == "__main__":
+        main()

@@ -68,17 +68,31 @@ def main():
 
         if rubric_file and submissions:
             if st.button("Run Marking"):
-                # Read the grading rubric
+                # Read and validate the grading rubric
                 try:
                     original_rubric_df = pd.read_csv(rubric_file)
+                    
+                    # Define required columns
+                    required_columns = ['Criterion', 'Max_Score', 'Description']
+                    
+                    # Check for required columns
+                    for col in required_columns:
+                        if col not in original_rubric_df.columns:
+                            st.error(f"Rubric file must contain a '{col}' column.")
+                            return
+                    
+                    # Ensure 'Max_Score' column is numeric
+                    if not pd.api.types.is_numeric_dtype(original_rubric_df['Max_Score']):
+                        st.error("The 'Max_Score' column must contain numeric values.")
+                        return
+                    
+                    # Ensure no missing values in essential columns
+                    if original_rubric_df[required_columns].isnull().any().any():
+                        st.error("The rubric file contains missing values in required columns.")
+                        return
+                
                 except Exception as e:
                     st.error(f"Error reading rubric: {e}")
-                    return
-
-                # Ensure there is a unique identifier for criteria
-                criterion_column = 'Criterion'
-                if criterion_column not in original_rubric_df.columns:
-                    st.error(f"Rubric must contain a '{criterion_column}' column.")
                     return
 
                 # Convert rubric to CSV string for prompt
@@ -89,6 +103,7 @@ def main():
                     student_name = os.path.splitext(submission.name)[0]
                     st.header(f"Processing {student_name}'s Submission")
 
+                    # Read student submission
                     try:
                         doc = docx.Document(submission)
                         student_text = '\n'.join([para.text for para in doc.paragraphs])
@@ -98,7 +113,7 @@ def main():
 
                     # Prepare prompt for ChatGPT
                     prompt = f"""
-                    You are an experienced educator tasked with grading student assignments based on the following rubric and assignment instructions. Provide feedback directly addressing the student.
+                    You are an experienced educator tasked with grading student assignments based on the following rubric and assignment instructions. Provide feedback directly addressing the student (e.g., "You have demonstrated...") rather than speaking about them in third person (e.g., "The student has demonstrated...").
 
                     Rubric (in CSV format):
                     {rubric_csv_string}
@@ -110,14 +125,18 @@ def main():
                     {student_text}
 
                     Your responsibilities:
-                    - Provide a completed grading rubric with scores and brief comments for each criterion, in JSON format.
+
+                    - Provide a completed grading rubric with scores and brief comments for each criterion, in JSON format, matching the rubric provided.
                     - Ensure that the JSON includes the keys '{criterion_column}', 'Score', and 'Comment' for each criterion.
-                    - Write concise overall comments and 'feedforward' bullet points for future improvement.
+                    - Write concise overall comments on the quality of the work, using language directly addressing the student.
+                    - List actionable 'feedforward' bullet points for future improvement, also using direct language.
 
                     Please output in the following format:
 
                     Completed Grading Rubric (JSON):
-                    [{{"Criterion": "Criterion 1", "Score": "Score 1", "Comment": "Comment 1"}}, ...]
+                    [{{"Criterion": "Criterion 1", "Score": "Score 1", "Comment": "Comment 1"}}, 
+                     {{"Criterion": "Criterion 2", "Score": "Score 2", "Comment": "Comment 2"}},
+                     ... (continue for all criteria)]
 
                     Overall Comments:
                     [Text]
@@ -128,6 +147,10 @@ def main():
 
                     # Call ChatGPT API
                     feedback = call_chatgpt(prompt, max_tokens=3000)
+                    if feedback:
+                        st.success(f"Feedback generated for {student_name}")
+                        # Process and generate feedback document...
+
 
                     if feedback:
                         st.success(f"Feedback generated for {student_name}")

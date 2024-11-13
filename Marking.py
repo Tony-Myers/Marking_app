@@ -142,40 +142,41 @@ def main():
 
                     # Call ChatGPT API
     feedback = call_chatgpt(prompt, max_tokens=3000)
-            if feedback:
-                        st.success(f"Feedback generated for {student_name}")
+    if feedback:
+            st.success(f"Feedback generated for {student_name}")
 
                         # Parse the feedback
-            try:
+        try:
                             # Split the feedback into sections
-                sections = feedback.split('Completed Grading Rubric (JSON):')
-                    if len(sections) < 2:
-                                st.error("Failed to parse the completed grading rubric from the AI response.")
-                                st.write("AI Response:")
-                                st.code(feedback)
-                                continue
-                            rest = sections[1]
-                            rubric_section, rest = rest.split('Overall Comments:', 1)
-                            overall_comments_section, feedforward_section = rest.split('Feedforward:', 1)
+        sections = feedback.split('Completed Grading Rubric (JSON):')
+            if len(sections) < 2:
+                    st.error("Failed to parse the completed grading rubric from the AI response.")
+                    st.write("AI Response:")
+                    st.code(feedback)
+                    continue
+                    rest = sections[1]
+                    rubric_section, rest = rest.split('Overall Comments:', 1)
+                    overall_comments_section, feedforward_section = rest.split('Feedforward:', 1)
 
                             # Read the completed rubric JSON
-                            rubric_json = rubric_section.strip()
-                            completed_rubric_data = json.loads(rubric_json)
-                            completed_rubric_df = pd.DataFrame(completed_rubric_data)
+                    rubric_json = rubric_section.strip()
+                    completed_rubric_data = json.loads(rubric_json)
+                    completed_rubric_df = pd.DataFrame(completed_rubric_data)
 
                             # Ensure 'Score' and 'Comment' columns are present
-                            if 'Score' not in completed_rubric_df.columns or 'Comment' not in completed_rubric_df.columns:
-                                st.error("The AI response is missing 'Score' or 'Comment' keys.")
-                                st.write("AI Response:")
-                                st.code(feedback)
-                                continue
+                    if 'Score' not in completed_rubric_df.columns or 'Comment' not in completed_rubric_df.columns:
+                    st.error("The AI response is missing 'Score' or 'Comment' keys.")
+                                
+                    st.write("AI Response:")
+                    st.code(feedback)
+                    continue
 
-                            # Get overall comments and feedforward
-                            overall_comments = overall_comments_section.strip()
+                     # Get overall comments and feedforward
+                     overall_comments = overall_comments_section.strip()
                             feedforward = feedforward_section.strip()
 
-                            # Merge the original rubric with the completed rubric
-                            merged_rubric_df = original_rubric_df.merge(
+                    # Merge the original rubric with the completed rubric
+                    merged_rubric_df = original_rubric_df.merge(
                                 completed_rubric_df[[criterion_column, 'Score', 'Comment']],
                                 on=criterion_column,
                                 how='left'

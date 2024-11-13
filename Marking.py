@@ -10,8 +10,16 @@ PASSWORD = st.secrets["password"]
 OPENAI_API_KEY = st.secrets["openai_api_key"]
 openai.api_key = OPENAI_API_KEY  # Set the OpenAI API key
 
-except Exception as e:
-        return f"An error occurred in generate_response: {str(e)}"
+def function_name():
+    # Indent by 4 spaces inside the function
+    for item in iterable:
+        try:
+            # Code block inside try
+            pass
+        except Exception as e:
+            # Code block inside except
+            pass
+
 def call_chatgpt(prompt, model="gpt-4o", max_tokens=500, temperature=0.7, retries=2):
     """Calls the OpenAI API and returns the response as text."""
     for attempt in range(retries):

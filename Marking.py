@@ -5,6 +5,7 @@ import docx
 from docx.oxml.ns import nsdecls
 from docx.oxml import parse_xml
 import os
+import json
 from io import BytesIO
 import io
 
@@ -15,7 +16,7 @@ OPENAI_API_KEY = st.secrets["openai_api_key"]
 # Instantiate the OpenAI client
 client = OpenAI(api_key=OPENAI_API_KEY)
 
-def call_chatgpt(prompt, model="gpt-3.5-turbo", max_tokens=2000, temperature=0.7, retries=2):
+def call_chatgpt(prompt, model="gpt-3.5-turbo", max_tokens=3000, temperature=0.7, retries=2):
     """Calls the OpenAI API using the client instance and returns the response as text."""
     for attempt in range(retries):
         try:
@@ -105,7 +106,7 @@ def main():
                     prompt = f"""
 You are an experienced educator tasked with grading student assignments based on the following rubric and assignment instructions.
 
-Rubric:
+Rubric (in CSV format):
 {rubric_csv_string}
 
 Assignment Task:
@@ -116,16 +117,17 @@ Student's Submission:
 
 Your responsibilities:
 
-- Provide a completed grading rubric with scores and brief comments for each criterion, in CSV format, matching the rubric provided.
-
+- Provide a completed grading rubric with scores and brief comments for each criterion, in JSON format, matching the rubric provided.
+- Ensure that the JSON includes the keys '{criterion_column}', 'Score', and 'Comment' for each criterion.
 - Write concise overall comments on the quality of the work.
-
 - List actionable 'feedforward' bullet points for future improvement.
 
 Please output in the following format:
 
-Completed Grading Rubric (CSV):
-[CSV data]
+Completed Grading Rubric (JSON):
+[{{"Criterion": "Criterion 1", "Score": "Score 1", "Comment": "Comment 1"}}, 
+ {{"Criterion": "Criterion 2", "Score": "Score 2", "Comment": "Comment 2"}},
+ ... (continue for all criteria)]
 
 Overall Comments:
 [Text]
@@ -135,24 +137,34 @@ Feedforward:
 """
 
                     # Call ChatGPT API
-                    feedback = call_chatgpt(prompt, max_tokens=2000)
+                    feedback = call_chatgpt(prompt, max_tokens=3000)
                     if feedback:
                         st.success(f"Feedback generated for {student_name}")
 
                         # Parse the feedback
                         try:
                             # Split the feedback into sections
-                            sections = feedback.split('Completed Grading Rubric (CSV):')
+                            sections = feedback.split('Completed Grading Rubric (JSON):')
                             if len(sections) < 2:
                                 st.error("Failed to parse the completed grading rubric from the AI response.")
+                                st.write("AI Response:")
+                                st.code(feedback)
                                 continue
                             rest = sections[1]
                             rubric_section, rest = rest.split('Overall Comments:', 1)
                             overall_comments_section, feedforward_section = rest.split('Feedforward:', 1)
 
-                            # Read the completed rubric CSV
-                            rubric_csv = io.StringIO(rubric_section.strip())
-                            completed_rubric_df = pd.read_csv(rubric_csv)
+                            # Read the completed rubric JSON
+                            rubric_json = rubric_section.strip()
+                            completed_rubric_data = json.loads(rubric_json)
+                            completed_rubric_df = pd.DataFrame(completed_rubric_data)
+
+                            # Ensure 'Score' and 'Comment' columns are present
+                            if 'Score' not in completed_rubric_df.columns or 'Comment' not in completed_rubric_df.columns:
+                                st.error("The AI response is missing 'Score' or 'Comment' keys.")
+                                st.write("AI Response:")
+                                st.code(feedback)
+                                continue
 
                             # Get overall comments and feedforward
                             overall_comments = overall_comments_section.strip()
@@ -167,6 +179,8 @@ Feedforward:
 
                         except Exception as e:
                             st.error(f"Error parsing AI response: {e}")
+                            st.write("AI Response:")
+                            st.code(feedback)
                             continue
 
                         # Create a Word document for the feedback
@@ -191,7 +205,7 @@ Feedforward:
                                     cell.text = str(row[col_name])
 
                                     # Highlight cells in 'Score' and 'Comment' columns where there is data
-                                    if col_name in ['Score', 'Comment'] and not pd.isnull(row[col_name]):
+                                    if col_name in ['Score', 'Comment'] and pd.notnull(row[col_name]):
                                         shading_elm = parse_xml(r'<w:shd {} w:fill="D9EAD3"/>'.format(nsdecls('w')))
                                         cell._tc.get_or_add_tcPr().append(shading_elm)
 
@@ -220,3 +234,4 @@ Feedforward:
 
 if __name__ == "__main__":
     main()
+    

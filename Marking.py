@@ -187,15 +187,15 @@ Feedforward:
                             for i, column in enumerate(merged_rubric_df.columns):
                                 hdr_cells[i].text = str(column)
 
-                            # Add data rows and apply shading to "Score" and "Comment" cells
+                            # Add data rows and apply shading to selected "Score" cells based on grading decision
                             for _, row in merged_rubric_df.iterrows():
                                 row_cells = table.add_row().cells
                                 for i, col_name in enumerate(merged_rubric_df.columns):
                                     cell = row_cells[i]
                                     cell.text = str(row[col_name])
 
-                                    # Apply shading only to "Score" and "Comment" cells
-                                    if col_name in ['Score', 'Comment'] and pd.notnull(row[col_name]):
+                                    # Apply shading only to the "Score" cell that matches the rubric decision
+                                    if col_name == 'Score' and pd.notnull(row['Score']):
                                         shading_elm = parse_xml(r'<w:shd {} w:fill="D9EAD3"/>'.format(nsdecls('w')))
                                         cell._tc.get_or_add_tcPr().append(shading_elm)
 

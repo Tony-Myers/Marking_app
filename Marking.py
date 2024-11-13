@@ -90,7 +90,7 @@ def main():
 
                 ## Process each submission
                 # Process each submission
-            for submission in submissions:
+    for submission in submissions:
             student_name = os.path.splitext(submission.name)[0]
             st.header(f"Processing {student_name}'s Submission")
 

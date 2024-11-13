@@ -56,7 +56,14 @@ def parse_csv_section(csv_text):
     """Parses a CSV section line by line."""
     return csv_text.strip()
 
+def initialize_session_state():
+    """Initializes session state for storing feedback."""
+    if 'feedbacks' not in st.session_state:
+        st.session_state['feedbacks'] = {}
+
 def main():
+    initialize_session_state()
+    
     if check_password():
         st.title("🔐 Automated Assignment Grading and Feedback")
 
@@ -96,6 +103,12 @@ def main():
 
                 for submission in submissions:
                     student_name = os.path.splitext(submission.name)[0]
+                    
+                    # Skip if feedback already exists for this student
+                    if student_name in st.session_state['feedbacks']:
+                        st.info(f"Feedback already generated for {student_name}.")
+                        continue
+
                     st.header(f"Processing {student_name}'s Submission")
 
                     # Read student submission
@@ -106,9 +119,8 @@ def main():
                         st.error(f"Error reading submission {submission.name}: {e}")
                         continue
 
-                    # Prepare prompt for ChatGPT
                     prompt = f"""
-You are an experienced educator tasked with grading a student's assignment based on the provided rubric and assignment instructions.
+You are an experienced educator tasked with grading a student's assignment based on the provided rubric and assignment instructions. Please ensure that your feedback adheres to UK Higher Education standards for undergraduate work. Use British English spelling throughout your feedback.
 
 **Instructions:**
 
@@ -116,6 +128,25 @@ You are an experienced educator tasked with grading a student's assignment based
 - For **each criterion** in the list below, assign a numerical score between 0 and 100 (e.g., 75) and provide a brief comment.
 - Ensure that the score is numeric without any extra symbols or text.
 - The scores should reflect the student's performance according to the descriptors in the rubric.
+- **Be strict in your grading to align with UK undergraduate standards.**
+- **Assess the quality of writing and referencing style, ensuring adherence to the 'Cite them Right' guidelines (2008, Pear Tree Books). Provide a brief comment on these aspects in the overall comments.**
+
+**List of Criteria:**
+{criteria_string}
+
+**Rubric (in CSV format):**
+{rubric_csv_string}
+
+**Assignment Task:**
+{assignment_task}
+
+**Student's Submission:**
+{student_text}
+
+**Your Output Format:**
+
+Please provide your feedback in the following format:
+
 
 **List of Criteria:**
 {criteria_string}
@@ -133,7 +164,6 @@ You are an experienced educator tasked with grading a student's assignment based
 
 Please output your feedback in the exact format below, ensuring you include **all criteria**:
 
-
 **Important Notes:**
 
 - **Begin your response with the CSV section**, starting with "Criterion,Score,Comment".
@@ -144,7 +174,8 @@ Please output your feedback in the exact format below, ensuring you include **al
 - **Do not use markdown formatting** like bold, italics, or headers.
 - **Ensure there are no extra lines or missing lines**.
 - **Your entire response should be in plain text**.
-
+- **Use second person narrative ("You...") in Overall Comments and Feedforward.**
+- **Ensure British English spelling is used.**
 """
 
                     # Call ChatGPT API
@@ -152,8 +183,8 @@ Please output your feedback in the exact format below, ensuring you include **al
                     if feedback:
                         st.success(f"Feedback generated for {student_name}")
 
-                        # Display AI's response for debugging
-                        st.text_area("AI Response", feedback, height=300)
+                        # Display AI's response for debugging (optional)
+                        # st.text_area("AI Response", feedback, height=300)
 
                         # Parse the feedback
                         try:
@@ -204,12 +235,19 @@ Please output your feedback in the exact format below, ensuring you include **al
                                 suffixes=('', '_ai')  # Suffix for AI feedback columns
                             ).dropna(how="all", axis=1)
 
-                            # Display DataFrames for debugging
-                            st.write("Completed Rubric DataFrame:")
-                            st.dataframe(completed_rubric_df)
+                            # Store the feedback in session state to persist across reruns
+                            st.session_state['feedbacks'][student_name] = {
+                                'merged_rubric_df': merged_rubric_df,
+                                'overall_comments': overall_comments,
+                                'feedforward': feedforward
+                            }
 
-                            st.write("Merged Rubric DataFrame:")
-                            st.dataframe(merged_rubric_df)
+                            # Optionally, display DataFrames for debugging
+                            # st.write("Completed Rubric DataFrame:")
+                            # st.dataframe(completed_rubric_df)
+
+                            # st.write("Merged Rubric DataFrame:")
+                            # st.dataframe(merged_rubric_df)
 
                         except Exception as e:
                             st.error(f"Error parsing AI response: {e}")
@@ -217,75 +255,91 @@ Please output your feedback in the exact format below, ensuring you include **al
                             st.code(feedback)
                             continue
 
-                        # Create Word document for feedback
-                        feedback_doc = docx.Document()
+                st.success("All submissions have been processed.")
 
-                        # Set page to landscape
-                        section = feedback_doc.sections[0]
-                        section.orientation = WD_ORIENT.LANDSCAPE
-                        new_width, new_height = section.page_height, section.page_width
-                        section.page_width = new_width
-                        section.page_height = new_height
+        # After processing, display the feedbacks and download buttons
+        if st.session_state.get('feedbacks'):
+            st.header("Generated Feedbacks")
+            for student_name, feedback_data in st.session_state['feedbacks'].items():
+                st.subheader(f"Feedback for {student_name}")
 
-                        feedback_doc.add_heading(f"Feedback for {student_name}", level=1)
+                merged_rubric_df = feedback_data['merged_rubric_df']
+                overall_comments = feedback_data['overall_comments']
+                feedforward = feedback_data['feedforward']
 
-                        if not merged_rubric_df.empty:
-                            # Prepare columns for the Word table
-                            table_columns = [criterion_column] + percentage_columns + ['Score', 'Comment']
-                            table = feedback_doc.add_table(rows=1, cols=len(table_columns))
-                            table.style = 'Table Grid'
-                            hdr_cells = table.rows[0].cells
-                            for i, column in enumerate(table_columns):
-                                hdr_cells[i].text = str(column)
+                # Display the merged rubric dataframe
+                st.write("Rubric Scores and Comments:")
+                st.dataframe(merged_rubric_df)
 
-                            # Add data rows and apply shading to the appropriate descriptor cell
-                            for _, row in merged_rubric_df.iterrows():
-                                row_cells = table.add_row().cells
-                                score = row['Score']
-                                for i, col_name in enumerate(table_columns):
-                                    cell = row_cells[i]
-                                    cell_text = str(row[col_name])
-                                    cell.text = cell_text
+                # Create Word document for feedback
+                feedback_doc = docx.Document()
 
-                                    # Apply shading to the descriptor cell matching the score range
-                                    if col_name in percentage_columns and pd.notnull(score):
-                                        # Extract numeric values from the percentage range
-                                        range_text = col_name.replace('%', '').strip()
-                                        lower_upper = range_text.split('-')
-                                        if len(lower_upper) == 2:
-                                            try:
-                                                lower = float(lower_upper[0].strip())
-                                                upper = float(lower_upper[1].strip())
+                # Set page to landscape
+                section = feedback_doc.sections[0]
+                section.orientation = WD_ORIENT.LANDSCAPE
+                new_width, new_height = section.page_height, section.page_width
+                section.page_width = new_width
+                section.page_height = new_height
 
-                                                # Use the score as a float
-                                                score_value = float(score)
+                feedback_doc.add_heading(f"Feedback for {student_name}", level=1)
 
-                                                if lower <= score_value <= upper:
-                                                    # Apply green shading to this cell
-                                                    shading_elm = parse_xml(r'<w:shd {} w:fill="D9EAD3"/>'.format(nsdecls('w')))
-                                                    cell._tc.get_or_add_tcPr().append(shading_elm)
-                                            except ValueError as e:
-                                                st.warning(f"Error converting score or range to float: {e}")
-                                                continue
+                if not merged_rubric_df.empty:
+                    # Prepare columns for the Word table
+                    table_columns = [criterion_column] + percentage_columns + ['Score', 'Comment']
+                    table = feedback_doc.add_table(rows=1, cols=len(table_columns))
+                    table.style = 'Table Grid'
+                    hdr_cells = table.rows[0].cells
+                    for i, column in enumerate(table_columns):
+                        hdr_cells[i].text = str(column)
 
-                        # Add overall comments and feedforward
-                        feedback_doc.add_heading('Overall Comments', level=2)
-                        feedback_doc.add_paragraph(overall_comments.strip())
-                        feedback_doc.add_heading('Feedforward', level=2)
-                        feedback_doc.add_paragraph(feedforward.strip())
+                    # Add data rows and apply shading to the appropriate descriptor cell
+                    for _, row in merged_rubric_df.iterrows():
+                        row_cells = table.add_row().cells
+                        score = row['Score']
+                        for i, col_name in enumerate(table_columns):
+                            cell = row_cells[i]
+                            cell_text = str(row[col_name])
+                            cell.text = cell_text
 
-                        buffer = BytesIO()
-                        feedback_doc.save(buffer)
-                        buffer.seek(0)
+                            # Apply shading to the descriptor cell matching the score range
+                            if col_name in percentage_columns and pd.notnull(score):
+                                # Extract numeric values from the percentage range
+                                range_text = col_name.replace('%', '').strip()
+                                lower_upper = range_text.split('-')
+                                if len(lower_upper) == 2:
+                                    try:
+                                        lower = float(lower_upper[0].strip())
+                                        upper = float(lower_upper[1].strip())
 
-                        st.download_button(
-                            label=f"Download Feedback for {student_name}",
-                            data=buffer,
-                            file_name=f"{student_name}_feedback.docx",
-                            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                        )
-                    else:
-                        st.error(f"Failed to generate feedback for {student_name}")
+                                        # Use the score as a float
+                                        score_value = float(score)
+
+                                        if lower <= score_value <= upper:
+                                            # Apply green shading to this cell
+                                            shading_elm = parse_xml(r'<w:shd {} w:fill="D9EAD3"/>'.format(nsdecls('w')))
+                                            cell._tc.get_or_add_tcPr().append(shading_elm)
+                                    except ValueError as e:
+                                        st.warning(f"Error converting score or range to float: {e}")
+                                        continue
+
+                # Add overall comments and feedforward
+                feedback_doc.add_heading('Overall Comments', level=2)
+                feedback_doc.add_paragraph(overall_comments.strip())
+                feedback_doc.add_heading('Feedforward', level=2)
+                feedback_doc.add_paragraph(feedforward.strip())
+
+                buffer = BytesIO()
+                feedback_doc.save(buffer)
+                buffer.seek(0)
+
+                # Provide download button for the feedback document
+                st.download_button(
+                    label=f"Download Feedback for {student_name}",
+                    data=buffer,
+                    file_name=f"{student_name}_feedback.docx",
+                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                )
 
 if __name__ == "__main__":
     main()
+    

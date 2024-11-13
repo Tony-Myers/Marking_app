@@ -6,7 +6,9 @@ import os
 from io import BytesIO
 
 # Set your OpenAI API key from secrets
-openai.api_key = st.secrets["general"]["openai_api_key"]
+PASSWORD = st.secrets["password"]
+OPENAI_API_KEY = st.secrets["openai_api_key"]
+
 
 def call_chatgpt(prompt, model="gpt-4", max_tokens=500, temperature=0.7, retries=2):
     # Your existing API call code

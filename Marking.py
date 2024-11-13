@@ -61,6 +61,8 @@ def parse_csv_section(csv_text):
                 lines.append(",".join(fields))
             else:
                 st.warning(f"Skipping malformed line: {line}")
+        else:
+            st.warning(f"Skipping line with incorrect number of commas: {line}")
     return "\n".join(lines)
 
 def main():
@@ -157,12 +159,13 @@ Feedforward:
                             completed_rubric_df = pd.read_csv(StringIO(csv_feedback_cleaned), dtype={criterion_column: str})
                             overall_comments, feedforward = comments_section.split('Feedforward:')
 
-                            # Select only the necessary columns
+                            # Merge the dataframes with specified suffixes
                             merged_rubric_df = original_rubric_df.merge(
                                 completed_rubric_df[[criterion_column, 'Score', 'Comment']],
                                 on=criterion_column,
-                                how='left'
-                            ).dropna(how="all", axis=1)  # Drop unnecessary columns with all NaN values
+                                how='left',
+                                suffixes=('_rubric', '')  # Suffix for original rubric columns
+                            ).dropna(how="all", axis=1)
 
                         except Exception as e:
                             st.error(f"Error parsing AI response: {e}")
@@ -176,7 +179,9 @@ Feedforward:
                         # Set page to landscape
                         section = feedback_doc.sections[0]
                         section.orientation = docx.enum.section.WD_ORIENT.LANDSCAPE
-                        section.page_width, section.page_height = section.page_height, section.page_width
+                        new_width, new_height = section.page_height, section.page_width
+                        section.page_width = new_width
+                        section.page_height = new_height
 
                         feedback_doc.add_heading(f"Feedback for {student_name}", level=1)
 
@@ -194,7 +199,7 @@ Feedforward:
                                     cell = row_cells[i]
                                     cell.text = str(row[col_name])
 
-                                    # Apply shading only to the "Score" cell that matches the rubric decision
+                                    # Apply shading only to the "Score" cell from AI feedback
                                     if col_name == 'Score' and pd.notnull(row['Score']):
                                         shading_elm = parse_xml(r'<w:shd {} w:fill="D9EAD3"/>'.format(nsdecls('w')))
                                         cell._tc.get_or_add_tcPr().append(shading_elm)
@@ -220,3 +225,4 @@ Feedforward:
 
 if __name__ == "__main__":
     main()
+    

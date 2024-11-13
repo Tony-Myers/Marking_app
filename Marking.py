@@ -203,24 +203,29 @@ Feedforward:
                                 score = row['Score']
                                 for i, col_name in enumerate(table_columns):
                                     cell = row_cells[i]
-
-                                    if col_name == 'Score' or col_name == 'Comment':
-                                        cell.text = str(row[col_name])
-                                    else:
-                                        cell.text = str(row[col_name])
+                                    cell_text = str(row[col_name])
+                                    cell.text = cell_text
 
                                     # Apply shading to the descriptor cell matching the score range
                                     if col_name in percentage_columns and pd.notnull(score):
-                                        # Extract numeric values from the percentage range column
-                                        range_text = col_name.replace('%', '')
+                                        # Extract numeric values from the percentage range
+                                        range_text = col_name.replace('%', '').strip()
                                         lower_upper = range_text.split('-')
                                         if len(lower_upper) == 2:
-                                            lower = float(lower_upper[0])
-                                            upper = float(lower_upper[1])
-                                            if lower <= score <= upper:
-                                                # Apply green shading to this cell
-                                                shading_elm = parse_xml(r'<w:shd {} w:fill="D9EAD3"/>'.format(nsdecls('w')))
-                                                cell._tc.get_or_add_tcPr().append(shading_elm)
+                                            try:
+                                                lower = float(lower_upper[0].strip())
+                                                upper = float(lower_upper[1].strip())
+
+                                                # Convert score to float
+                                                score_value = float(str(score).replace('%', '').strip())
+
+                                                if lower <= score_value <= upper:
+                                                    # Apply green shading to this cell
+                                                    shading_elm = parse_xml(r'<w:shd {} w:fill="D9EAD3"/>'.format(nsdecls('w')))
+                                                    cell._tc.get_or_add_tcPr().append(shading_elm)
+                                            except ValueError as e:
+                                                st.warning(f"Error converting score or range to float: {e}")
+                                                continue
 
                         # Add overall comments and feedforward
                         feedback_doc.add_heading('Overall Comments', level=2)
@@ -243,3 +248,4 @@ Feedforward:
 
 if __name__ == "__main__":
     main()
+    

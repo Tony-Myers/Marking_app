@@ -2,7 +2,7 @@ import streamlit as st
 from openai import OpenAI
 import pandas as pd
 import docx
-from io import BytesIO
+from io import BytesIO, StringIO 
 import os
 import json
 

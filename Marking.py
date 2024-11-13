@@ -1,4 +1,3 @@
-
 import streamlit as st
 from openai import OpenAI
 import pandas as pd
@@ -9,7 +8,7 @@ import os
 from io import BytesIO
 import io
 
-# Set your OpenAI API key from secrets
+# Set your OpenAI API key and password from secrets
 PASSWORD = st.secrets["password"]
 OPENAI_API_KEY = st.secrets["openai_api_key"]
 
@@ -81,8 +80,9 @@ def main():
                     return
 
                 # Ensure there is a unique identifier for criteria
-                if 'Criterion' not in original_rubric_df.columns:
-                    st.error("Rubric must contain a 'Criterion' column.")
+                criterion_column = 'Criterion'  # Default column name
+                if criterion_column not in original_rubric_df.columns:
+                    st.error(f"Rubric must contain a '{criterion_column}' column.")
                     return
 
                 # Convert rubric to CSV string for prompt
@@ -160,8 +160,8 @@ Feedforward:
 
                             # Merge the original rubric with the completed rubric
                             merged_rubric_df = original_rubric_df.merge(
-                                completed_rubric_df[['Criterion', 'Score', 'Comment']],
-                                on='Criterion',
+                                completed_rubric_df[[criterion_column, 'Score', 'Comment']],
+                                on=criterion_column,
                                 how='left'
                             )
 

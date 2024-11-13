@@ -103,7 +103,7 @@ def main():
 
                     # Prepare prompt for ChatGPT
 # Prepare prompt for ChatGPT
-prompt = f"""
+        prompt = f"""
 You are an experienced educator tasked with grading student assignments based on the following rubric and assignment instructions. Provide feedback directly addressing the student (e.g., "You have demonstrated...") rather than speaking about them in third person (e.g., "The student has demonstrated...").
 
 Rubric (in CSV format):

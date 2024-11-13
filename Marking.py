@@ -108,6 +108,9 @@ def main():
     if check_password():
         st.title("🔐 Automated Assignment Grading and Feedback")
 
+        # Define the column name for criterion here to make it accessible throughout the function
+        criterion_column = 'Criterion'
+
         st.header("Assignment Task")
         assignment_task = st.text_area("Enter the Assignment Task or Instructions (Optional)", height=150)
 
@@ -117,9 +120,6 @@ def main():
 
         if rubric_file and submissions:
             if st.button("Run Marking"):
-                # Define the column name for criterion before usage
-                criterion_column = 'Criterion'
-
                 # Read the grading rubric
                 try:
                     original_rubric_df = pd.read_csv(rubric_file, dtype={criterion_column: str})
@@ -387,27 +387,4 @@ Feedforward:
                                                 shading_elm = parse_xml(r'<w:shd {} w:fill="D9EAD3"/>'.format(nsdecls('w')))
                                                 cell._tc.get_or_add_tcPr().append(shading_elm)
                                         except ValueError as e:
-                                            st.warning(f"Error converting score or range to float: {e}")
-                                            continue
-
-                    # Add overall comments and feedforward
-                    feedback_doc.add_heading('Overall Comments', level=2)
-                    feedback_doc.add_paragraph(overall_comments.strip())
-                    feedback_doc.add_heading('Feedforward', level=2)
-                    feedback_doc.add_paragraph(feedforward.strip())
-
-                    buffer = BytesIO()
-                    feedback_doc.save(buffer)
-                    buffer.seek(0)
-
-                    # Provide download button for the feedback document
-                    st.download_button(
-                        label=f"Download Feedback for {student_name}",
-                        data=buffer,
-                        file_name=f"{student_name}_feedback.docx",
-                        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                    )
-
-if __name__ == "__main__":
-    main()
-
+                                

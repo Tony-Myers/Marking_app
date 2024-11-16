@@ -124,7 +124,7 @@ def main():
         criterion_column = 'Criterion'
 
         st.header("Assignment Task and Level of Work")
-        assignment_task = st.text_area("Enter the Assignment Task or Instructions and the HE level", height=150)
+        assignment_task = st.text_area("Enter the Assignment Task or Instructions, as well as the HE level tye woek should be marked at", height=150)
 
         st.header("Upload Files")
         rubric_file = st.file_uploader("Upload Grading Rubric (CSV)", type=['csv'])

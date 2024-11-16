@@ -123,8 +123,8 @@ def main():
         # Define the column name for criterion here to make it accessible throughout the function
         criterion_column = 'Criterion'
 
-        st.header("Assignment Task")
-        assignment_task = st.text_area("Enter the Assignment Task or Instructions (Optional)", height=150)
+        st.header("Assignment Task and Level of Work")
+        assignment_task = st.text_area("Enter the Assignment Task or Instructions and the HE level", height=150)
 
         st.header("Upload Files")
         rubric_file = st.file_uploader("Upload Grading Rubric (CSV)", type=['csv'])

@@ -118,7 +118,7 @@ def main():
     initialize_session_state()
     
     if check_password():
-        st.title("🔐 Automated Assignment Grading and Feedback")
+        st.title("✏️ Automated Assignment Grading and Feedback © Tony Myers")
 
         # Define the column name for criterion here to make it accessible throughout the function
         criterion_column = 'Criterion'

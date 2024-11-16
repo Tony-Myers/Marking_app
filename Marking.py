@@ -194,16 +194,16 @@ def main():
 
                     # Prepare prompt for ChatGPT with modifications
                     prompt = f"""
-You are an experienced educator tasked with grading a student's assignment based on the provided rubric and assignment instructions. Please ensure that your feedback adheres to UK Higher Education standards for undergraduate work. Use British English spelling throughout your feedback.
+You are an experienced UK acadmic tasked with grading a student's assignment based on the provided rubric and assignment instructions. Please ensure that your feedback adheres to UK Higher Education standards for undergraduate work. Use British English spelling throughout your feedback.
 
 **Instructions:**
 
-- Review the student's submission thoroughly.
-- For **each criterion** in the list below, assign a numerical score between 0 and 100 (e.g., 75) and provide a brief comment.
+- Review the student's submission thoroughly and be strict in applying the crieria.
+- For **each criterion** in the list below, assign a numerical score between 0 and 100 (e.g., 75) and provide a brief but nuianced comment.
 - Ensure that the score is numeric without any extra symbols or text.
 - The scores should reflect the student's performance according to the descriptors in the rubric.
 - **Be strict in your grading to align with UK undergraduate standards.**
-- **Assess the quality of writing and referencing style, ensuring adherence to the 'Cite them Right' guidelines (2008, Pear Tree Books). Provide a brief comment on these aspects in the overall comments.**
+- **Assess the quality of writing and referencing style, ensuring adherence to the 'Cite them Right' guidelines (2008, Pear Tree Books). Provide a brief comment on these aspects in the overall comments but refer to the referecing syyle as Birmingham Newman University’s referencing style in feedback. .**
 
 **List of Criteria:**
 {criteria_string}
@@ -235,7 +235,7 @@ Please output your feedback in the exact format below, ensuring you include **al
 - **Ensure British English spelling is used.**
 - **Overall Comments should not exceed 150 words.**
 - **Feedforward should be a bulleted list within 150 words.**
-- **Comments on each criterion should be concise, in the second person, and not exceed 200 words in total.**
+- **Comments on each criterion should be concise, in the second person, and not exceed 150 words in total.**
 - **Ensure that all fields containing commas are enclosed in double quotes.**
 - **Provide an example of the expected CSV format below.**
 

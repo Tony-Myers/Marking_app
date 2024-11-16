@@ -194,7 +194,7 @@ def main():
 
                     # Prepare prompt for ChatGPT with modifications
                     prompt = f"""
-You are an experienced UK acadmic tasked with grading a student's assignment based on the provided rubric and assignment instructions. Please ensure that your feedback adheres to UK Higher Education standards for undergraduate work. Use British English spelling throughout your feedback.
+You are an experienced UK acadmic tasked with grading a student's assignment based on the provided rubric and assignment instructions. Please ensure that your feedback adheres to UK Higher Education standards for undergraduate work, noting the level provided by the user. Use British English spelling throughout your feedback.
 
 **Instructions:**
 

@@ -1,3 +1,10 @@
+# Standard library imports
+import os
+from io import BytesIO, StringIO
+import csv
+import re
+
+# Third-party imports
 import streamlit as st
 from openai import OpenAI
 import pandas as pd
@@ -5,11 +12,9 @@ import docx
 from docx.enum.section import WD_ORIENT
 from docx.oxml.ns import nsdecls
 from docx.oxml import parse_xml
-import os
-from io import BytesIO, StringIO
 import tiktoken
-import csv
-import re
+import fitz  # PyMuPDF
+
 
 # Set your OpenAI API key and password from secrets
 PASSWORD = st.secrets["password"]
@@ -20,7 +25,7 @@ client = OpenAI(api_key=OPENAI_API_KEY)
 
 # Initialize the tiktoken encoder for GPT-4
 try:
-    encoding = tiktoken.encoding_for_model("gpt-4")
+    encoding = tiktoken.encoding_for_model("gpt-4o")
 except KeyError:
     encoding = tiktoken.get_encoding("cl100k_base")
 
@@ -56,6 +61,24 @@ def call_chatgpt(prompt, model="gpt-4o", max_tokens=3000, temperature=0.3, retri
             else:
                 st.error(f"API Error: {e}")
                 return None
+
+def extract_text_from_docx(file):
+    """Extracts text from a DOCX file."""
+    doc = docx.Document(file)
+    return '\n'.join([para.text for para in doc.paragraphs])
+
+def extract_text_from_pdf(file):
+    """Extracts text from a PDF file."""
+    pdf_document = fitz.open(stream=file.read(), filetype="pdf")
+    text = ""
+    for page_num in range(len(pdf_document)):
+        page = pdf_document.load_page(page_num)
+        text += page.get_text()
+    return text
+
+def extract_text_from_txt(file):
+    """Extracts text from a TXT file."""
+    return file.read().decode('utf-8')
 
 def check_password():
     """Prompts the user for a password and checks it."""
@@ -128,7 +151,7 @@ def main():
 
         st.header("Upload Files")
         rubric_file = st.file_uploader("Upload Grading Rubric (CSV)", type=['csv'])
-        submissions = st.file_uploader("Upload Student Submissions (.docx)", type=['docx'], accept_multiple_files=True)
+        submissions = submissions = st.file_uploader("Upload Student Submissions (.docx, .pdf, .txt)",type=['docx', 'pdf', 'txt'] accept_multiple_files=True)
 
         if rubric_file and submissions:
             if st.button("Run Marking"):
@@ -336,13 +359,7 @@ Feedforward:
                                 'total_mark': total_mark  # Store total_mark here
                             }
 
-                            # Optionally, display DataFrames for debugging
-                            # st.write("Completed Rubric DataFrame:")
-                            # st.dataframe(completed_rubric_df)
-
-                            # st.write("Merged Rubric DataFrame:")
-                            # st.dataframe(merged_rubric_df)
-
+     
                         except Exception as e:
                             st.error(f"Error parsing AI response: {e}")
                             st.write("AI Response:")

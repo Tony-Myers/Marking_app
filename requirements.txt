@@ -4,3 +4,4 @@ pandas
 python-docx
 tiktoken
 PyMuPDF
+pymupdf

@@ -226,47 +226,67 @@ def main():
                             continue
 
                     # Prepare prompt for ChatGPT with modifications
-                    prompt = f"""
+                                       prompt = f"""
 You are an experienced UK academic tasked with grading a student's assignment based on the provided rubric and assignment instructions. Please ensure that your feedback adheres to UK Higher Education standards for undergraduate work, noting the level provided by the user. Use British English spelling throughout your feedback.
 
-**Instructions**:
+**Instructions:**
 
-1. Provide feedback directly addressed to the student using **second-person perspective** ("you").
-2. Structure the feedback in three distinct sections:
-    a. CSV feedback in the format "Criterion,Score,Comment".
-    b. **Overall Comments**: Detailed comments on the student's work (limit to 150 words), always using "you" to address the student directly.
-    c. **Feedforward**: Specific actionable suggestions for improvement, presented as a bulleted list (within 150 words), using "you" throughout.
+- Review the student's submission thoroughly and be strict in applying the criteria.
+- For **each criterion** in the list below, assign a numerical score between 0 and 100 (e.g., 75) and provide a brief but nuanced comment.
+- Ensure that the score is numeric without any extra symbols or text.
+- The scores should reflect the student's performance according to the descriptors in the rubric.
+- **Be strict in your grading to align with UK undergraduate standards.**
+- **Assess the quality of writing and referencing style, ensuring adherence to the 'Cite them Right' guidelines (2008, Pear Tree Books). Provide a brief comment on these aspects in the overall comments but refer to the referencing style as Birmingham Newman University’s referencing style in feedback. .**
 
-**List of Criteria**:
+**List of Criteria:**
 {criteria_string}
 
-**Rubric (in CSV format)**:
+**Rubric (in CSV format):**
 {rubric_csv_string}
 
-**Assignment Task**:
+**Assignment Task:**
 {assignment_task}
 
-**Student's Submission**:
+**Student's Submission:**
 {student_text}
 
-**Your Output Format**:
+**Your Output Format:**
 
-- Start with the CSV section, starting with "Criterion,Score,Comment".
-- Include "Overall Comments:" followed by the overall comments text (maximum of 150 words).
-- Include "Feedforward:" followed by the suggestions as a bulleted list.
+Please output your feedback in the exact format below, ensuring you include **all criteria**:
 
-**Ensure strict adherence to this format**:
+**Important Notes:**
 
-CSV Section (starts with "Criterion,Score,Comment")
+- **Begin your response with the CSV section**, starting with "Criterion,Score,Comment".
+- **Include all criteria** from the list provided.
+- **Do not omit any sections**.
+- **Do not include any additional text** or formatting outside of the specified format.
+- **Ensure that 'Overall Comments:' and 'Feedforward:' are included exactly as shown**, with the colon and on separate lines.
+- **Do not use markdown formatting** like bold, italics, or headers.
+- **Ensure there are no extra lines or missing lines**.
+- **Your entire response should be in plain text**.
+- **Use second person narrative ("You...") in Overall Comments and Feedforward.**
+- **Ensure British English spelling is used.**
+- **Overall Comments should not exceed 150 words.**
+- **Feedforward should be a bulleted list within 150 words.**
+- **Comments on each criterion should be concise, in the second person, and not exceed 150 words in total.**
+- **Ensure that all fields containing commas are enclosed in double quotes.**
+- **Provide an example of the expected CSV format below.**
+
+**Example:**
+
 Overall Comments:
-<overall_comments>
-Feedforward:
-- <feedforward_1>
-- <feedforward_2>
-...
+Your essay provides a solid foundation in linking Functionalism and Critical Theory to the issue of racism in football. While you demonstrate a good understanding of the theories, the analysis could be more critical and less descriptive. The structure of your essay is generally clear, but some sections could benefit from improved coherence and flow. Your referencing style is mostly consistent with the 'Cite them Right' guidelines, but ensure all sources are correctly formatted and cited.
 
-**Important**: Always address the student directly using "you".
-"""
+Feedforward:
+- Focus on making explicit connections between theory and issue to strengthen your analysis.
+- Aim for a more critical application of theory, moving beyond description to provide deeper insights.
+- Enhance the structure by ensuring each paragraph has a clear topic sentence and logical progression.
+- Review 'Cite them Right' guidelines to ensure all references are correctly formatted.
+- Consider using more varied sources to support your arguments and provide a broader perspective.
+
+**Note:** Additionally, please include a **Total Mark** based on the weighted scores of each criterion. This total mark should only appear in the downloaded `.docx` file and not in the Streamlit app.
+
+                    """
 
                     feedback = call_chatgpt(prompt, max_tokens=1500, temperature=0.3)
                     if feedback:

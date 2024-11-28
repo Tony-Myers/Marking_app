@@ -113,15 +113,6 @@ def initialize_session_state():
     if 'feedbacks' not in st.session_state:
         st.session_state['feedbacks'] = {}
 
-# Function to extract text from .pdf files
-def extract_text_from_pdf(pdf_file):
-    pdf_document = fitz.open(stream=pdf_file.read(), filetype="pdf")
-    text = ""
-    for page_num in range(pdf_document.page_count):
-        page = pdf_document.load_page(page_num)
-        text += page.get_text()
-    return text
-
 # Function to extract text from .txt files
 def extract_text_from_txt(txt_file):
     return txt_file.read().decode("utf-8")
@@ -154,11 +145,16 @@ def extract_text_from_docx(docx_file):
 
 # Function to extract text from .pdf files
 def extract_text_from_pdf(pdf_file):
-    reader = PdfReader(pdf_file)
-    text = ""
-    for page in reader.pages:
-        text += page.extract_text()
-    return text
+    try:
+        reader = PdfReader(pdf_file)
+        text = ""
+        for page in reader.pages:
+            page_text = page.extract_text()
+            if page_text:
+                text += page_text
+        return text
+    except Exception as e:
+        raise ValueError(f"Error processing PDF file: {e}")
 
 # Function to extract text from .txt files
 def extract_text_from_txt(txt_file):

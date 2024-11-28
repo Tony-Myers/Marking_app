@@ -181,12 +181,12 @@ def main():
                 criteria_list = original_rubric_df[criterion_column].tolist()
                 criteria_string = '\n'.join(criteria_list)
 
-                for submission in submissions:
+             for submission in submissions:
     student_name = os.path.splitext(submission.name)[0]
     
     # Skip if feedback already exists for this student
-        if student_name in st.session_state['feedbacks']:
-            st.info(f"Feedback already generated for {student_name}.")
+    if student_name in st.session_state['feedbacks']:
+        st.info(f"Feedback already generated for {student_name}.")
         continue
 
     st.header(f"Processing {student_name}'s Submission")
@@ -205,6 +205,7 @@ def main():
     except Exception as e:
         st.error(f"Error reading submission {submission.name}: {e}")
         continue
+
 
     # Summarize the student submission if it's too long
     student_tokens = count_tokens(student_text, encoding)

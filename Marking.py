@@ -3,18 +3,15 @@ import streamlit as st
 from openai import OpenAI
 import pandas as pd
 import docx
-from PyPDF2 import PdfReader
+from docx.enum.section import WD_ORIENT
+from docx.oxml.ns import nsdecls
+from docx.oxml import parse_xml
+import os
 from io import BytesIO, StringIO
 import tiktoken
 import csv
 import re
-import os
-import time
-
-# Additional imports for document handling
-from docx.enum.section import WD_ORIENT
-from docx.oxml import parse_xml
-from docx.oxml.ns import nsdecls
+from PyPDF2 import PdfReader
 
 # Set your OpenAI API key and password from secrets
 PASSWORD = st.secrets["password"]
@@ -32,7 +29,6 @@ except KeyError:
 MAX_TOKENS = 7000  # Maximum tokens for GPT-4
 PROMPT_BUFFER = 1000  # Buffer to ensure we don't exceed the limit
 
-# Additional utility functions
 def count_tokens(text, encoding):
     """Counts the number of tokens in a given text."""
     return len(encoding.encode(text))
@@ -49,7 +45,6 @@ def call_chatgpt(prompt, model="gpt-4", max_tokens=3000, temperature=0.3, retrie
     """Calls the OpenAI API using the client instance and returns the response as text."""
     for attempt in range(retries):
         try:
-            st.write(f"Attempt {attempt + 1} to contact OpenAI API...")  # Debug output
             response = client.chat.completions.create(
                 model=model,
                 messages=[{"role": "user", "content": prompt}],
@@ -58,11 +53,10 @@ def call_chatgpt(prompt, model="gpt-4", max_tokens=3000, temperature=0.3, retrie
             )
             return response.choices[0].message.content.strip()
         except Exception as e:
-            st.error(f"API Error on attempt {attempt + 1}: {e}")
-            time.sleep(2)  # Wait before retrying
             if attempt < retries - 1:
                 continue
             else:
+                st.error(f"API Error: {e}")
                 return None
 
 def check_password():
@@ -98,7 +92,6 @@ def parse_csv_section(csv_text):
 
 def summarize_text(text):
     """Summarizes the given text using OpenAI API."""
-    st.write("Calling ChatGPT to summarize text...")  # Debug output
     summary_prompt = f"""
 You are an assistant that summarizes academic papers. Please provide a concise summary (max 500 words) of the following text:
 
@@ -123,7 +116,7 @@ def initialize_session_state():
     if 'feedbacks' not in st.session_state:
         st.session_state['feedbacks'] = {}
 
-# Functions to extract text from files
+# Function to extract text from .docx files
 def extract_text_from_docx(docx_file):
     try:
         doc = docx.Document(docx_file)
@@ -132,6 +125,7 @@ def extract_text_from_docx(docx_file):
         st.error(f"Error reading DOCX file: {e}")
         return None
 
+# Function to extract text from .pdf files
 def extract_text_from_pdf(pdf_file):
     try:
         reader = PdfReader(pdf_file)
@@ -143,13 +137,6 @@ def extract_text_from_pdf(pdf_file):
         return text
     except Exception as e:
         st.error(f"Error reading PDF file: {e}")
-        return None
-
-def extract_text_from_txt(txt_file):
-    try:
-        return txt_file.read().decode("utf-8")
-    except Exception as e:
-        st.error(f"Error reading TXT file: {e}")
         return None
 
 def main():
@@ -166,14 +153,13 @@ def main():
 
         st.header("Upload Files")
         rubric_file = st.file_uploader("Upload Grading Rubric (CSV)", type=['csv'])
-        submissions = st.file_uploader("Upload Student Submissions (.docx, .pdf, .txt)", type=['docx', 'pdf', 'txt'], accept_multiple_files=True)
+        submissions = st.file_uploader("Upload Student Submissions (.docx, .pdf)", type=['docx', 'pdf'], accept_multiple_files=True)
 
         if rubric_file and submissions:
             if st.button("Run Marking"):
                 # Read the grading rubric
                 try:
                     original_rubric_df = pd.read_csv(rubric_file, dtype={criterion_column: str})
-                    st.write("Rubric file loaded successfully.")  # Debug output
                 except Exception as e:
                     st.error(f"Error reading rubric: {e}")
                     return
@@ -199,26 +185,27 @@ def main():
                 criteria_list = original_rubric_df[criterion_column].tolist()
                 criteria_string = '\n'.join(criteria_list)
 
-                # Process each student submission
                 for submission in submissions:
                     student_name = os.path.splitext(submission.name)[0]
+                    
+                    # Skip if feedback already exists for this student
+                    if student_name in st.session_state['feedbacks']:
+                        st.info(f"Feedback already generated for {student_name}.")
+                        continue
 
                     st.header(f"Processing {student_name}'s Submission")
 
                     # Read student submission
-                    student_text = None
                     try:
                         if submission.type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
                             student_text = extract_text_from_docx(submission)
                         elif submission.type == "application/pdf":
                             student_text = extract_text_from_pdf(submission)
-                        elif submission.type == "text/plain":
-                            student_text = extract_text_from_txt(submission)
                         else:
                             st.error(f"Unsupported file type: {submission.type}")
                             continue
 
-                        # If student_text extraction failed, skip this submission
+                        # If text extraction failed, skip this submission
                         if not student_text:
                             st.error(f"Failed to extract text from {submission.name}. Skipping.")
                             continue
@@ -226,8 +213,6 @@ def main():
                     except Exception as e:
                         st.error(f"Error reading submission {submission.name}: {e}")
                         continue
-
-                    st.write(f"Successfully extracted text for {student_name}.")
 
                     # Summarize the student submission if it's too long
                     student_tokens = count_tokens(student_text, encoding)
@@ -237,13 +222,14 @@ def main():
                         st.info(f"Summarizing {student_name}'s submission to reduce token count.")
                         student_text = summarize_text(student_text)
                         if not student_text:
-                            st.error(f"Failed to summarize submission for {student_name}. Skipping.")
+                            st.error(f"Failed to summarize submission for {student_name}.")
                             continue
 
-                    st.write(f"Successfully summarized text for {student_name}.")
+                    # Recalculate tokens after summarization
+                    student_tokens = count_tokens(student_text, encoding)
 
-                    # Generate feedback with all promotional details
-                    feedback_prompt = f"""
+                    # Prepare prompt for ChatGPT with modifications
+                    prompt = f"""
 You are an experienced UK academic tasked with grading a student's assignment based on the provided rubric and assignment instructions. Please ensure that your feedback adheres to UK Higher Education standards for undergraduate work, noting the level provided by the user. Use British English spelling throughout your feedback.
 
 **Instructions:**
@@ -273,29 +259,140 @@ You are an experienced UK academic tasked with grading a student's assignment ba
 - Include all criteria from the list provided.
 - Provide overall comments and feedforward.
 """
-                    feedback = call_chatgpt(feedback_prompt, max_tokens=1500)
-                    if not feedback:
-                        st.error(f"Failed to generate feedback for {student_name}. Skipping.")
-                        continue
 
-                    # Store feedback in session state
-                    st.session_state['feedbacks'][student_name] = {
-                        'feedback_text': feedback,
-                    }
+                    feedback = call_chatgpt(prompt, max_tokens=1500, temperature=0.3)
+                    if feedback:
+                        st.success(f"Feedback generated for {student_name}")
 
-                    st.success(f"Finished processing {student_name}'s submission.")
+                        # Parse the feedback
+                        try:
+                            # Check if 'Overall Comments:' is in the feedback
+                            if 'Overall Comments:' in feedback:
+                                csv_feedback = feedback.split('Overall Comments:', 1)[0].strip()
+                                comments_section = feedback.split('Overall Comments:', 1)[1].strip()
+                            else:
+                                st.error("The AI's response is missing 'Overall Comments:'. Please adjust the prompt or try again.")
+                                st.write("AI Response:")
+                                st.code(feedback)
+                                continue
 
-        # After processing, provide download buttons for the feedback
-        if st.session_state.get('feedbacks'):
-            st.header("Generated Feedbacks")
-            for student_name, feedback_data in st.session_state['feedbacks'].items():
-                try:
+                            # Check if the CSV section is present
+                            if 'Criterion,Score,Comment' in csv_feedback:
+                                completed_rubric_df = parse_csv_section(csv_feedback)
+                                if completed_rubric_df is None:
+                                    st.error("Failed to parse the CSV feedback.")
+                                    st.write("AI Response:")
+                                    st.code(feedback)
+                                    continue
+                            else:
+                                st.error("The AI's response is missing the CSV section with 'Criterion,Score,Comment'. Please adjust the prompt or try again.")
+                                st.write("AI Response:")
+                                st.code(feedback)
+                                continue
+
+                            # Extract overall comments and feedforward
+                            overall_comments = ''
+                            feedforward = ''
+                            if 'Feedforward:' in comments_section:
+                                overall_comments = comments_section.split('Feedforward:', 1)[0].strip()
+                                feedforward = comments_section.split('Feedforward:', 1)[1].strip()
+                            else:
+                                st.warning("The AI's response is missing 'Feedforward:'. Please adjust the prompt or try again.")
+                                overall_comments = comments_section.strip()
+                                feedforward = ''
+
+                            # Merge the dataframes with specified suffixes
+                            merged_rubric_df = original_rubric_df.merge(
+                                completed_rubric_df[[criterion_column, 'Score', 'Comment']],
+                                on=criterion_column,
+                                how='left',
+                                suffixes=('', '_ai')  # Suffix for AI feedback columns
+                            ).dropna(how="all", axis=1)
+
+                            # Calculate Weighted Scores and Total Mark
+                            merged_rubric_df['Weighted_Score'] = merged_rubric_df['Weight'] * merged_rubric_df['Score'] / 100
+                            total_mark = merged_rubric_df['Weighted_Score'].sum()
+
+                            # Store the feedback in session state to persist across reruns
+                            st.session_state['feedbacks'][student_name] = {
+                                'merged_rubric_df': merged_rubric_df,
+                                'overall_comments': overall_comments,
+                                'feedforward': feedforward,
+                                'percentage_columns': percentage_columns,
+                                'total_mark': total_mark  # Store total_mark here
+                            }
+
+                        except Exception as e:
+                            st.error(f"Error parsing AI response: {e}")
+                            st.write("AI Response:")
+                            st.code(feedback)
+                            continue
+
+            st.success("All submissions have been processed.")
+
+            # After processing, provide download buttons for the feedback documents
+            if st.session_state.get('feedbacks'):
+                st.header("Generated Feedbacks")
+                for student_name, feedback_data in st.session_state['feedbacks'].items():
+                    # Create Word document for feedback
                     feedback_doc = docx.Document()
 
-                    feedback_doc.add_heading(f"Feedback for {student_name}", level=1)
-                    feedback_doc.add_paragraph(feedback_data['feedback_text'])
+                    # Set page to landscape
+                    section = feedback_doc.sections[0]
+                    section.orientation = WD_ORIENT.LANDSCAPE
+                    new_width, new_height = section.page_height, section.page_width
+                    section.page_width = new_width
+                    section.page_height = new_height
 
-                    # Create buffer to hold the document data
+                    feedback_doc.add_heading(f"Feedback for {student_name}", level=1)
+
+                    if not feedback_data['merged_rubric_df'].empty:
+                        # Prepare columns for the Word table
+                        table_columns = [criterion_column] + feedback_data['percentage_columns'] + ['Score', 'Comment']
+                        table = feedback_doc.add_table(rows=1, cols=len(table_columns))
+                        table.style = 'Table Grid'
+                        hdr_cells = table.rows[0].cells
+                        for i, column in enumerate(table_columns):
+                            hdr_cells[i].text = str(column)
+
+                        # Add data rows and apply shading to the appropriate descriptor cell
+                        for _, row in feedback_data['merged_rubric_df'].iterrows():
+                            row_cells = table.add_row().cells
+                            score = row['Score']
+                            for i, col_name in enumerate(table_columns):
+                                cell = row_cells[i]
+                                cell_text = str(row[col_name])
+                                cell.text = cell_text
+
+                                # Apply shading to the descriptor cell matching the score range
+                                if col_name in feedback_data['percentage_columns'] and pd.notnull(score):
+                                    range_text = col_name.replace('%', '').strip()
+                                    lower_upper = range_text.split('-')
+                                    if len(lower_upper) == 2:
+                                        try:
+                                            lower = float(lower_upper[0].strip())
+                                            upper = float(lower_upper[1].strip())
+
+                                            score_value = float(score)
+
+                                            if lower <= score_value <= upper:
+                                                # Apply green shading to this cell
+                                                shading_elm = parse_xml(r'<w:shd {} w:fill="D9EAD3"/>'.format(nsdecls('w')))
+                                                cell._tc.get_or_add_tcPr().append(shading_elm)
+                                        except ValueError as e:
+                                            st.warning(f"Error converting score or range to float: {e}")
+                                            continue
+
+                    # Add overall comments and feedforward
+                    feedback_doc.add_heading('Overall Comments', level=2)
+                    feedback_doc.add_paragraph(feedback_data['overall_comments'].strip())
+                    feedback_doc.add_heading('Feedforward', level=2)
+                    feedback_doc.add_paragraph(feedback_data['feedforward'].strip())
+
+                    # Add Total Mark
+                    feedback_doc.add_heading('Total Mark', level=2)
+                    feedback_doc.add_paragraph(f"{feedback_data['total_mark']:.2f}")
+
                     buffer = BytesIO()
                     feedback_doc.save(buffer)
                     buffer.seek(0)
@@ -307,8 +404,6 @@ You are an experienced UK academic tasked with grading a student's assignment ba
                         file_name=f"{student_name}_feedback.docx",
                         mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                     )
-                except Exception as e:
-                    st.error(f"Error creating feedback document for {student_name}: {e}")
 
 if __name__ == "__main__":
     main()

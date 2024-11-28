@@ -181,23 +181,43 @@ def main():
                 criteria_list = original_rubric_df[criterion_column].tolist()
                 criteria_string = '\n'.join(criteria_list)
 
-                for submission in submissions:
-                    student_name = os.path.splitext(submission.name)[0]
-                    
-                    # Skip if feedback already exists for this student
-                    if student_name in st.session_state['feedbacks']:
-                        st.info(f"Feedback already generated for {student_name}.")
-                        continue
+             for submission in submissions:
+                student_name = os.path.splitext(submission.name)[0]
+    
+    # Skip if feedback already exists for this student
+            if student_name in st.session_state['feedbacks']:
+                st.info(f"Feedback already generated for {student_name}.")
+                continue
 
-                    st.header(f"Processing {student_name}'s Submission")
+            st.header(f"Processing {student_name}'s Submission")
 
-                    # Read student submission
-                    try:
-                        doc = docx.Document(submission)
-                        student_text = '\n'.join([para.text for para in doc.paragraphs])
-                    except Exception as e:
-                        st.error(f"Error reading submission {submission.name}: {e}")
-                        continue
+    # Read student submission
+    try:
+        if submission.type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
+            student_text = extract_text_from_docx(submission)
+        elif submission.type == "application/pdf":
+            student_text = extract_text_from_pdf(submission)
+        elif submission.type == "text/plain":
+            student_text = extract_text_from_txt(submission)
+        else:
+            st.error(f"Unsupported file type: {submission.type}")
+            continue
+    except Exception as e:
+        st.error(f"Error reading submission {submission.name}: {e}")
+        continue
+
+    # Summarize the student submission if it's too long
+    student_tokens = count_tokens(student_text, encoding)
+    max_submission_tokens = MAX_TOKENS - PROMPT_BUFFER  # Reserve tokens for prompt and other texts
+
+    if student_tokens > (MAX_TOKENS * 0.6):  # If submission is more than ~4k tokens
+        st.info(f"Summarizing {student_name}'s submission to reduce token count.")
+        student_text = summarize_text(student_text)
+        if not student_text:
+            st.error(f"Failed to summarize submission for {student_name}.")
+            continue
+
+    # Proceed with the grading process...
 
                     # Summarize the student submission if it's too long
                     student_tokens = count_tokens(student_text, encoding)

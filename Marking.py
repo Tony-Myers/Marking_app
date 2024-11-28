@@ -181,7 +181,7 @@ def main():
                 criteria_list = original_rubric_df[criterion_column].tolist()
                 criteria_string = '\n'.join(criteria_list)
 
-            for submission in submissions:
+                for submission in submissions:
     student_name = os.path.splitext(submission.name)[0]
     
     # Skip if feedback already exists for this student

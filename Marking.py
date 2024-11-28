@@ -164,7 +164,7 @@ def extract_text_from_pdf(pdf_file):
 # Function to extract text from .txt files
 def extract_text_from_txt(txt_file):
     return txt_file.read().decode("utf-8")
-            st.error(f"Error reading {uploaded_file.name}: {e}")
+    st.error(f"Error reading {uploaded_file.name}: {e}")
 
 if uploaded_files:
     for uploaded_file in uploaded_files:

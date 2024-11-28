@@ -147,6 +147,25 @@ if uploaded_files:
         except Exception as e:
             st.error(f"Error reading {uploaded_file.name}: {e}")
 
+# Function to extract text from .docx files
+def extract_text_from_docx(docx_file):
+    doc = docx.Document(docx_file)
+    return '\n'.join([para.text for para in doc.paragraphs])
+
+# Function to extract text from .pdf files
+def extract_text_from_pdf(pdf_file):
+    pdf_document = fitz.open(stream=pdf_file.read(), filetype="pdf")
+    text = ""
+    for page_num in range(pdf_document.page_count):
+        page = pdf_document.load_page(page_num)
+        text += page.get_text()
+    return text
+
+# Function to extract text from .txt files
+def extract_text_from_txt(txt_file):
+    return txt_file.read().decode("utf-8")
+            st.error(f"Error reading {uploaded_file.name}: {e}")
+
 if uploaded_files:
     for uploaded_file in uploaded_files:
         file_extension = os.path.splitext(uploaded_file.name)[1].lower()
@@ -173,6 +192,7 @@ if uploaded_files:
                 st.error(f"Error reading {uploaded_file.name}: {e}")
         else:
             st.error(f"Unsupported file type: {uploaded_file.name}")
+
 def main():
     initialize_session_state()
     

@@ -9,6 +9,7 @@ import tiktoken
 import csv
 import re
 import os
+import time
 
 # Additional imports for document handling
 from docx.enum.section import WD_ORIENT
@@ -31,6 +32,7 @@ except KeyError:
 MAX_TOKENS = 7000  # Maximum tokens for GPT-4
 PROMPT_BUFFER = 1000  # Buffer to ensure we don't exceed the limit
 
+# Additional utility functions
 def count_tokens(text, encoding):
     """Counts the number of tokens in a given text."""
     return len(encoding.encode(text))
@@ -47,6 +49,7 @@ def call_chatgpt(prompt, model="gpt-4o", max_tokens=3000, temperature=0.3, retri
     """Calls the OpenAI API using the client instance and returns the response as text."""
     for attempt in range(retries):
         try:
+            st.write(f"Attempt {attempt + 1} to contact OpenAI API...")  # Debug output
             response = client.chat.completions.create(
                 model=model,
                 messages=[{"role": "user", "content": prompt}],
@@ -56,6 +59,7 @@ def call_chatgpt(prompt, model="gpt-4o", max_tokens=3000, temperature=0.3, retri
             return response.choices[0].message.content.strip()
         except Exception as e:
             st.error(f"API Error on attempt {attempt + 1}: {e}")
+            time.sleep(2)  # Wait before retrying
             if attempt < retries - 1:
                 continue
             else:
@@ -94,6 +98,7 @@ def parse_csv_section(csv_text):
 
 def summarize_text(text):
     """Summarizes the given text using OpenAI API."""
+    st.write("Calling ChatGPT to summarize text...")  # Debug output
     summary_prompt = f"""
 You are an assistant that summarizes academic papers. Please provide a concise summary (max 500 words) of the following text:
 
@@ -118,7 +123,7 @@ def initialize_session_state():
     if 'feedbacks' not in st.session_state:
         st.session_state['feedbacks'] = {}
 
-# Function to extract text from .docx files
+# Functions to extract text from files
 def extract_text_from_docx(docx_file):
     try:
         doc = docx.Document(docx_file)
@@ -127,7 +132,6 @@ def extract_text_from_docx(docx_file):
         st.error(f"Error reading DOCX file: {e}")
         return None
 
-# Function to extract text from .pdf files
 def extract_text_from_pdf(pdf_file):
     try:
         reader = PdfReader(pdf_file)
@@ -141,7 +145,6 @@ def extract_text_from_pdf(pdf_file):
         st.error(f"Error reading PDF file: {e}")
         return None
 
-# Function to extract text from .txt files
 def extract_text_from_txt(txt_file):
     try:
         return txt_file.read().decode("utf-8")
@@ -170,6 +173,7 @@ def main():
                 # Read the grading rubric
                 try:
                     original_rubric_df = pd.read_csv(rubric_file, dtype={criterion_column: str})
+                    st.write("Rubric file loaded successfully.")  # Debug output
                 except Exception as e:
                     st.error(f"Error reading rubric: {e}")
                     return
@@ -187,13 +191,6 @@ def main():
 
                 # Generate rubric CSV string with all fields quoted
                 rubric_csv_string = original_rubric_df.to_csv(index=False, quoting=csv.QUOTE_ALL)
-
-                # Get the list of percentage range columns (e.g., '0-59%', '60-69%', etc.)
-                percentage_columns = [col for col in original_rubric_df.columns if '%' in col]
-
-                # Get the list of criteria
-                criteria_list = original_rubric_df[criterion_column].tolist()
-                criteria_string = '\n'.join(criteria_list)
 
                 # Process each student submission
                 for submission in submissions:
@@ -238,10 +235,73 @@ def main():
 
                     st.write(f"Successfully summarized text for {student_name}.")
 
-                    # Placeholder for feedback generation logic
-                    # You may insert feedback generation and storage in session state here
-                    
+                    # Generate feedback with all promotional details
+                    feedback_prompt = f"""
+You are an experienced UK academic tasked with grading a student's assignment based on the provided rubric and assignment instructions. Please ensure that your feedback adheres to UK Higher Education standards for undergraduate work, noting the level provided by the user. Use British English spelling throughout your feedback.
+
+**Instructions:**
+
+- Review the student's submission thoroughly and be strict in applying the criteria.
+- For **each criterion** in the list below, assign a numerical score between 0 and 100 (e.g., 75) and provide a brief but nuanced comment.
+- Ensure that the score is numeric without any extra symbols or text.
+- The scores should reflect the student's performance according to the descriptors in the rubric.
+- **Be strict in your grading to align with UK undergraduate standards.**
+- **Assess the quality of writing and referencing style, ensuring adherence to the 'Cite them Right' guidelines (2008, Pear Tree Books). Provide a brief comment on these aspects in the overall comments but refer to the referencing style as Birmingham Newman University’s referencing style in feedback.**
+
+**List of Criteria:**
+{criteria_string}
+
+**Rubric (in CSV format):**
+{rubric_csv_string}
+
+**Assignment Task:**
+{assignment_task}
+
+**Student's Submission:**
+{student_text}
+
+**Your Output Format:**
+
+- Begin your response with the CSV section, starting with "Criterion,Score,Comment".
+- Include all criteria from the list provided.
+- Provide overall comments and feedforward.
+"""
+                    feedback = call_chatgpt(feedback_prompt, max_tokens=1500)
+                    if not feedback:
+                        st.error(f"Failed to generate feedback for {student_name}. Skipping.")
+                        continue
+
+                    # Store feedback in session state
+                    st.session_state['feedbacks'][student_name] = {
+                        'feedback_text': feedback,
+                    }
+
                     st.success(f"Finished processing {student_name}'s submission.")
+
+        # After processing, provide download buttons for the feedback
+        if st.session_state.get('feedbacks'):
+            st.header("Generated Feedbacks")
+            for student_name, feedback_data in st.session_state['feedbacks'].items():
+                try:
+                    feedback_doc = docx.Document()
+
+                    feedback_doc.add_heading(f"Feedback for {student_name}", level=1)
+                    feedback_doc.add_paragraph(feedback_data['feedback_text'])
+
+                    # Create buffer to hold the document data
+                    buffer = BytesIO()
+                    feedback_doc.save(buffer)
+                    buffer.seek(0)
+
+                    # Provide download button for the feedback document
+                    st.download_button(
+                        label=f"Download Feedback for {student_name}",
+                        data=buffer,
+                        file_name=f"{student_name}_feedback.docx",
+                        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                    )
+                except Exception as e:
+                    st.error(f"Error creating feedback document for {student_name}: {e}")
 
 if __name__ == "__main__":
     main()

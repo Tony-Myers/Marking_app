@@ -22,7 +22,7 @@ client = OpenAI(api_key=OPENAI_API_KEY)
 
 # Initialize the tiktoken encoder for GPT-4
 try:
-    encoding = tiktoken.encoding_for_model("gpt-4o")
+    encoding = tiktoken.encoding_for_model("gpt-4")
 except KeyError:
     encoding = tiktoken.get_encoding("cl100k_base")
 
@@ -41,7 +41,7 @@ def truncate_text(text, max_tokens, encoding):
         return encoding.decode(truncated_tokens)
     return text
 
-def call_chatgpt(prompt, model="gpt-4o", max_tokens=3000, temperature=0.3, retries=2):
+def call_chatgpt(prompt, model="gpt-4", max_tokens=3000, temperature=0.3, retries=2):
     """Calls the OpenAI API using the client instance and returns the response as text."""
     for attempt in range(retries):
         try:
@@ -229,32 +229,38 @@ def main():
                     prompt = f"""
 You are an experienced UK academic tasked with grading a student's assignment based on the provided rubric and assignment instructions. Please ensure that your feedback adheres to UK Higher Education standards for undergraduate work, noting the level provided by the user. Use British English spelling throughout your feedback.
 
-**Instructions:**
+**Instructions**:
 
-- Review the student's submission thoroughly and be strict in applying the criteria.
-- For **each criterion** in the list below, assign a numerical score between 0 and 100 (e.g., 75) and provide a brief but nuanced comment.
-- Ensure that the score is numeric without any extra symbols or text.
-- The scores should reflect the student's performance according to the descriptors in the rubric.
-- **Be strict in your grading to align with UK undergraduate standards.**
-- **Assess the quality of writing and referencing style, ensuring adherence to the 'Cite them Right' guidelines (2008, Pear Tree Books). Provide a brief comment on these aspects in the overall comments but refer to the referencing style as Birmingham Newman University’s referencing style in feedback.**
+1. Provide feedback in three distinct sections:
+    a. CSV feedback in the format "Criterion,Score,Comment".
+    b. **Overall Comments**: Detailed comments on the student's work.
+    c. **Feedforward**: Specific actionable suggestions for improvement.
 
-**List of Criteria:**
+**List of Criteria**:
 {criteria_string}
 
-**Rubric (in CSV format):**
+**Rubric (in CSV format)**:
 {rubric_csv_string}
 
-**Assignment Task:**
+**Assignment Task**:
 {assignment_task}
 
-**Student's Submission:**
+**Student's Submission**:
 {student_text}
 
-**Your Output Format:**
+**Your Output Format**:
 
-- Begin your response with the CSV section, starting with "Criterion,Score,Comment".
-- Include all criteria from the list provided.
-- Provide overall comments and feedforward.
+- Start with the CSV section.
+- Include "Overall Comments:" followed by the overall comments text.
+- Include "Feedforward:" followed by the suggestions.
+
+**Ensure strict adherence to this format**:
+
+CSV Section (starts with "Criterion,Score,Comment")
+Overall Comments:
+<overall_comments>
+Feedforward:
+<feedforward>
 """
 
                     feedback = call_chatgpt(prompt, max_tokens=1500, temperature=0.3)
@@ -267,7 +273,7 @@ You are an experienced UK academic tasked with grading a student's assignment ba
                                 csv_feedback = feedback.split('Overall Comments:', 1)[0].strip()
                                 comments_section = feedback.split('Overall Comments:', 1)[1].strip()
                             else:
-                                st.error("The AI's response is missing 'Overall Comments:'. Please adjust the prompt or try again.")
+                                st.error("The AI's response is missing 'Overall Comments:'. Adjusting prompt and retrying.")
                                 continue
 
                             if 'Criterion,Score,Comment' in csv_feedback:
@@ -276,7 +282,7 @@ You are an experienced UK academic tasked with grading a student's assignment ba
                                     st.error("Failed to parse the CSV feedback.")
                                     continue
                             else:
-                                st.error("The AI's response is missing the CSV section with 'Criterion,Score,Comment'. Please adjust the prompt or try again.")
+                                st.error("The AI's response is missing the CSV section with 'Criterion,Score,Comment'. Adjusting prompt and retrying.")
                                 continue
 
                             # Extract overall comments and feedforward

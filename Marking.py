@@ -4,6 +4,7 @@ from openai import OpenAI
 import pandas as pd
 import docx
 import pymupdf
+import fitz  # This works after installing pymupdf
 from io import BytesIO, StringIO
 import tiktoken
 import csv

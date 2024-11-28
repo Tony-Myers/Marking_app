@@ -231,10 +231,11 @@ You are an experienced UK academic tasked with grading a student's assignment ba
 
 **Instructions**:
 
-1. Provide feedback in three distinct sections:
+1. Provide feedback directly addressed to the student using **second-person perspective** ("you").
+2. Structure the feedback in three distinct sections:
     a. CSV feedback in the format "Criterion,Score,Comment".
-    b. **Overall Comments**: Detailed comments on the student's work.
-    c. **Feedforward**: Specific actionable suggestions for improvement.
+    b. **Overall Comments**: Detailed comments on the student's work, always using "you" to address the student directly.
+    c. **Feedforward**: Specific actionable suggestions for improvement, also using "you".
 
 **List of Criteria**:
 {criteria_string}
@@ -250,7 +251,7 @@ You are an experienced UK academic tasked with grading a student's assignment ba
 
 **Your Output Format**:
 
-- Start with the CSV section.
+- Start with the CSV section, starting with "Criterion,Score,Comment".
 - Include "Overall Comments:" followed by the overall comments text.
 - Include "Feedforward:" followed by the suggestions.
 
@@ -261,6 +262,8 @@ Overall Comments:
 <overall_comments>
 Feedforward:
 <feedforward>
+
+**Important**: Always address the student directly using "you".
 """
 
                     feedback = call_chatgpt(prompt, max_tokens=1500, temperature=0.3)

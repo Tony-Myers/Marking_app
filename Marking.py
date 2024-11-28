@@ -226,7 +226,7 @@ def main():
                             continue
 
                     # Prepare prompt for ChatGPT with modifications
-                                       prompt = f"""
+                    prompt = f"""
 You are an experienced UK academic tasked with grading a student's assignment based on the provided rubric and assignment instructions. Please ensure that your feedback adheres to UK Higher Education standards for undergraduate work, noting the level provided by the user. Use British English spelling throughout your feedback.
 
 **Instructions:**
@@ -285,8 +285,10 @@ Feedforward:
 - Consider using more varied sources to support your arguments and provide a broader perspective.
 
 **Note:** Additionally, please include a **Total Mark** based on the weighted scores of each criterion. This total mark should only appear in the downloaded `.docx` file and not in the Streamlit app.
+**Important**: Always address the student directly using "you".
 
                     """
+
 
                     feedback = call_chatgpt(prompt, max_tokens=1500, temperature=0.3)
                     if feedback:
@@ -319,6 +321,9 @@ Feedforward:
                             else:
                                 overall_comments = comments_section.strip()
 
+                            # Split feedforward into individual bullet points
+                            feedforward_list = [item.strip() for item in feedforward.splitlines() if item.strip().startswith('-')]
+
                             # Merge the dataframes with specified suffixes
                             merged_rubric_df = original_rubric_df.merge(
                                 completed_rubric_df[[criterion_column, 'Score', 'Comment']],
@@ -335,7 +340,7 @@ Feedforward:
                             st.session_state['feedbacks'][student_name] = {
                                 'merged_rubric_df': merged_rubric_df,
                                 'overall_comments': overall_comments,
-                                'feedforward': feedforward,
+                                'feedforward': feedforward_list,
                                 'percentage_columns': percentage_columns,
                                 'total_mark': total_mark
                             }
@@ -396,8 +401,8 @@ Feedforward:
                     feedback_doc.add_heading('Overall Comments', level=2)
                     feedback_doc.add_paragraph(feedback_data['overall_comments'].strip())
                     feedback_doc.add_heading('Feedforward', level=2)
-                    for line in feedback_data['feedforward'].splitlines():
-                        feedback_doc.add_paragraph(line.strip(), style='ListBullet')
+                    for line in feedback_data['feedforward']:
+                        feedback_doc.add_paragraph(line, style='ListBullet')
 
                     feedback_doc.add_heading('Total Mark', level=2)
                     feedback_doc.add_paragraph(f"{feedback_data['total_mark']:.2f}")

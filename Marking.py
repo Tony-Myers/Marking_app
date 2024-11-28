@@ -113,28 +113,6 @@ def initialize_session_state():
     if 'feedbacks' not in st.session_state:
         st.session_state['feedbacks'] = {}
 
-
-# Streamlit file uploader
-uploaded_files = st.file_uploader("Upload files", type=['pdf','docx','txt'], accept_multiple_files=True)
-
-if uploaded_files:
-    for uploaded_file in uploaded_files:
-        file_extension = os.path.splitext(uploaded_file.name)[1].lower()
-        try:
-            if file_extension == '.docx':
-                text = extract_text_from_docx(uploaded_file)
-            elif file_extension == '.pdf':
-                text = extract_text_from_pdf(uploaded_file)
-            elif file_extension == '.txt':
-                text = extract_text_from_txt(uploaded_file)
-            else:
-                st.error(f"Unsupported file type: {uploaded_file.name}")
-                continue
-            st.write(f"Extracted text from {uploaded_file.name}:")
-            st.write(text)
-        except Exception as e:
-            st.error(f"Error reading {uploaded_file.name}: {e}")
-
 # Function to extract text from .docx files
 def extract_text_from_docx(docx_file):
     doc = docx.Document(docx_file)
@@ -156,34 +134,6 @@ def extract_text_from_pdf(pdf_file):
 # Function to extract text from .txt files
 def extract_text_from_txt(txt_file):
     return txt_file.read().decode("utf-8")
-    st.error(f"Error reading {uploaded_file.name}: {e}")
-
-if uploaded_files:
-    for uploaded_file in uploaded_files:
-        file_extension = os.path.splitext(uploaded_file.name)[1].lower()
-        if file_extension == '.docx':
-            try:
-                text = extract_text_from_docx(uploaded_file)
-                st.write(f"Extracted text from {uploaded_file.name}:")
-                st.write(text)
-            except Exception as e:
-                st.error(f"Error reading {uploaded_file.name}: {e}")
-        elif file_extension == '.pdf':
-            try:
-                text = extract_text_from_pdf(uploaded_file)
-                st.write(f"Extracted text from {uploaded_file.name}:")
-                st.write(text)
-            except Exception as e:
-                st.error(f"Error reading {uploaded_file.name}: {e}")
-        elif file_extension == '.txt':
-            try:
-                text = extract_text_from_txt(uploaded_file)
-                st.write(f"Extracted text from {uploaded_file.name}:")
-                st.write(text)
-            except Exception as e:
-                st.error(f"Error reading {uploaded_file.name}: {e}")
-        else:
-            st.error(f"Unsupported file type: {uploaded_file.name}")
 
 def main():
     initialize_session_state()
@@ -224,7 +174,6 @@ def main():
                 # Generate rubric CSV string with all fields quoted
                 rubric_csv_string = original_rubric_df.to_csv(index=False, quoting=csv.QUOTE_ALL)
 
-                # Get the list of percentage range columns (e.g., '0-59%', '60
                 # Get the list of percentage range columns (e.g., '0-59%', '60-69%', etc.)
                 percentage_columns = [col for col in original_rubric_df.columns if '%' in col]
 
@@ -265,6 +214,7 @@ def main():
                     student_tokens = count_tokens(student_text, encoding)
 
                     # Prepare prompt for ChatGPT with modifications
+  # Prepare prompt for ChatGPT with modifications
                     prompt = f"""
 You are an experienced UK academic tasked with grading a student's assignment based on the provided rubric and assignment instructions. Please ensure that your feedback adheres to UK Higher Education standards for undergraduate work, noting the level provided by the user. Use British English spelling throughout your feedback.
 
@@ -275,7 +225,7 @@ You are an experienced UK academic tasked with grading a student's assignment ba
 - Ensure that the score is numeric without any extra symbols or text.
 - The scores should reflect the student's performance according to the descriptors in the rubric.
 - **Be strict in your grading to align with UK undergraduate standards.**
-- **Assess the quality of writing and referencing style, ensuring adherence to the 'Cite them Right' guidelines (2008, Pear Tree Books). Provide a brief comment on these aspects in the overall comments but refer to the referencing style as Birmingham Newman University’s referencing style in feedback.**
+- **Assess the quality of writing and referencing style, ensuring adherence to the 'Cite them Right' guidelines (2008, Pear Tree Books). Provide a brief comment on these aspects in the overall comments but refer to the referencing style as Birmingham Newman University’s referencing style in feedback. .**
 
 **List of Criteria:**
 {criteria_string}
@@ -326,7 +276,7 @@ Feedforward:
 **Note:** Additionally, please include a **Total Mark** based on the weighted scores of each criterion. This total mark should only appear in the downloaded `.docx` file and not in the Streamlit app.
 
                     """
-
+                    
                     # Estimate total tokens
                     total_tokens = count_tokens(prompt, encoding)
                     if total_tokens > MAX_TOKENS:
@@ -372,7 +322,6 @@ Feedforward:
                                 continue
 
                             # Ensure all criteria are present
-                                                       # Ensure all criteria are present
                             missing_criteria = set(original_rubric_df[criterion_column]) - set(completed_rubric_df[criterion_column])
                             if missing_criteria:
                                 st.warning(f"The AI feedback is missing the following criteria: {missing_criteria}")
@@ -505,8 +454,3 @@ Feedforward:
 
 if __name__ == "__main__":
     main()
-
-
- 
-
- 

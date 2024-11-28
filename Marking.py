@@ -132,6 +132,24 @@ uploaded_files = st.file_uploader("Upload files", type=['docx', 'pdf', 'txt'], a
 if uploaded_files:
     for uploaded_file in uploaded_files:
         file_extension = os.path.splitext(uploaded_file.name)[1].lower()
+        try:
+            if file_extension == '.docx':
+                text = extract_text_from_docx(uploaded_file)
+            elif file_extension == '.pdf':
+                text = extract_text_from_pdf(uploaded_file)
+            elif file_extension == '.txt':
+                text = extract_text_from_txt(uploaded_file)
+            else:
+                st.error(f"Unsupported file type: {uploaded_file.name}")
+                continue
+            st.write(f"Extracted text from {uploaded_file.name}:")
+            st.write(text)
+        except Exception as e:
+            st.error(f"Error reading {uploaded_file.name}: {e}")
+
+if uploaded_files:
+    for uploaded_file in uploaded_files:
+        file_extension = os.path.splitext(uploaded_file.name)[1].lower()
         if file_extension == '.docx':
             try:
                 text = extract_text_from_docx(uploaded_file)

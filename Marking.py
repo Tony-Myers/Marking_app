@@ -55,10 +55,10 @@ def call_chatgpt(prompt, model="gpt-4", max_tokens=3000, temperature=0.3, retrie
             )
             return response.choices[0].message.content.strip()
         except Exception as e:
+            st.error(f"API Error on attempt {attempt + 1}: {e}")
             if attempt < retries - 1:
                 continue
             else:
-                st.error(f"API Error: {e}")
                 return None
 
 def check_password():
@@ -120,8 +120,12 @@ def initialize_session_state():
 
 # Function to extract text from .docx files
 def extract_text_from_docx(docx_file):
-    doc = docx.Document(docx_file)
-    return '\n'.join([para.text for para in doc.paragraphs])
+    try:
+        doc = docx.Document(docx_file)
+        return '\n'.join([para.text for para in doc.paragraphs])
+    except Exception as e:
+        st.error(f"Error reading DOCX file: {e}")
+        return None
 
 # Function to extract text from .pdf files
 def extract_text_from_pdf(pdf_file):
@@ -134,11 +138,16 @@ def extract_text_from_pdf(pdf_file):
                 text += page_text
         return text
     except Exception as e:
-        raise ValueError(f"Error processing PDF file: {e}")
+        st.error(f"Error reading PDF file: {e}")
+        return None
 
 # Function to extract text from .txt files
 def extract_text_from_txt(txt_file):
-    return txt_file.read().decode("utf-8")
+    try:
+        return txt_file.read().decode("utf-8")
+    except Exception as e:
+        st.error(f"Error reading TXT file: {e}")
+        return None
 
 def main():
     initialize_session_state()
@@ -186,17 +195,14 @@ def main():
                 criteria_list = original_rubric_df[criterion_column].tolist()
                 criteria_string = '\n'.join(criteria_list)
 
+                # Process each student submission
                 for submission in submissions:
                     student_name = os.path.splitext(submission.name)[0]
-                    
-                    # Skip if feedback already exists for this student
-                    if student_name in st.session_state['feedbacks']:
-                        st.info(f"Feedback already generated for {student_name}.")
-                        continue
 
                     st.header(f"Processing {student_name}'s Submission")
 
                     # Read student submission
+                    student_text = None
                     try:
                         if submission.type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
                             student_text = extract_text_from_docx(submission)
@@ -207,9 +213,17 @@ def main():
                         else:
                             st.error(f"Unsupported file type: {submission.type}")
                             continue
+
+                        # If student_text extraction failed, skip this submission
+                        if not student_text:
+                            st.error(f"Failed to extract text from {submission.name}. Skipping.")
+                            continue
+
                     except Exception as e:
                         st.error(f"Error reading submission {submission.name}: {e}")
                         continue
+
+                    st.write(f"Successfully extracted text for {student_name}.")
 
                     # Summarize the student submission if it's too long
                     student_tokens = count_tokens(student_text, encoding)
@@ -219,92 +233,15 @@ def main():
                         st.info(f"Summarizing {student_name}'s submission to reduce token count.")
                         student_text = summarize_text(student_text)
                         if not student_text:
-                            st.error(f"Failed to summarize submission for {student_name}.")
+                            st.error(f"Failed to summarize submission for {student_name}. Skipping.")
                             continue
 
-                    # Placeholder for ChatGPT call and feedback storage logic
+                    st.write(f"Successfully summarized text for {student_name}.")
 
-    # After processing, provide download buttons without displaying any feedback
-    if st.session_state.get('feedbacks'):
-        st.header("Generated Feedbacks")
-        for student_name, feedback_data in st.session_state['feedbacks'].items():
-            # No display of rubric scores or comments in the app
-
-            # Create Word document for feedback
-            try:
-                feedback_doc = docx.Document()
-
-                # Set page to landscape
-                section = feedback_doc.sections[0]
-                section.orientation = WD_ORIENT.LANDSCAPE
-                new_width, new_height = section.page_height, section.page_width
-                section.page_width = new_width
-                section.page_height = new_height
-
-                # Add Title
-                feedback_doc.add_heading(f"Feedback for {student_name}", level=1)
-
-                if not feedback_data['merged_rubric_df'].empty:
-                    # Prepare columns for the Word table
-                    table_columns = [criterion_column] + feedback_data['percentage_columns'] + ['Score', 'Comment']
-                    table = feedback_doc.add_table(rows=1, cols=len(table_columns))
-                    table.style = 'Table Grid'
-                    hdr_cells = table.rows[0].cells
-                    for i, column in enumerate(table_columns):
-                        hdr_cells[i].text = str(column)
-
-                    # Add data rows and apply shading to the appropriate descriptor cell
-                    for _, row in feedback_data['merged_rubric_df'].iterrows():
-                        row_cells = table.add_row().cells
-                        score = row['Score']
-                        for i, col_name in enumerate(table_columns):
-                            cell = row_cells[i]
-                            cell_text = str(row[col_name])
-                            cell.text = cell_text
-
-                            # Apply shading to the descriptor cell matching the score range
-                            if col_name in feedback_data['percentage_columns'] and pd.notnull(score):
-                                range_text = col_name.replace('%', '').strip()
-                                lower_upper = range_text.split('-')
-                                if len(lower_upper) == 2:
-                                    try:
-                                        lower = float(lower_upper[0].strip())
-                                        upper = float(lower_upper[1].strip())
-                                        score_value = float(score)
-
-                                        if lower <= score_value <= upper:
-                                            shading_elm = parse_xml(r'<w:shd {} w:fill="D9EAD3"/>'.format(nsdecls('w')))
-                                            cell._tc.get_or_add_tcPr().append(shading_elm)
-                                    except ValueError as e:
-                                        st.warning(f"Error converting score or range to float: {e}")
-                                        continue
-
-                # Add Overall Comments and Feedforward
-                feedback_doc.add_heading('Overall Comments', level=2)
-                feedback_doc.add_paragraph(feedback_data['overall_comments'].strip())
-
-                feedback_doc.add_heading('Feedforward', level=2)
-                feedback_doc.add_paragraph(feedback_data['feedforward'].strip())
-
-                # Add Total Mark
-                feedback_doc.add_heading('Total Mark', level=2)
-                feedback_doc.add_paragraph(f"{feedback_data['total_mark']:.2f}")
-
-                # Create buffer to hold the document data
-                buffer = BytesIO()
-                feedback_doc.save(buffer)
-                buffer.seek(0)
-
-                # Provide download button for the feedback document
-                st.download_button(
-                    label=f"Download Feedback for {student_name}",
-                    data=buffer,
-                    file_name=f"{student_name}_feedback.docx",
-                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                )
-
-            except Exception as e:
-                st.error(f"Error creating feedback document for {student_name}: {e}")
+                    # Placeholder for feedback generation logic
+                    # You may insert feedback generation and storage in session state here
+                    
+                    st.success(f"Finished processing {student_name}'s submission.")
 
 if __name__ == "__main__":
     main()

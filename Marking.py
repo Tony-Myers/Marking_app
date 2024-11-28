@@ -127,7 +127,7 @@ def extract_text_from_txt(txt_file):
     return txt_file.read().decode("utf-8")
 
 # Streamlit file uploader
-uploaded_files = st.file_uploader("Upload files", type=['docx', 'pdf', 'txt'], accept_multiple_files=True)
+uploaded_files = st.file_uploader("Upload files", type=['pdf','docx','txt'], accept_multiple_files=True)
 
 if uploaded_files:
     for uploaded_file in uploaded_files:

@@ -113,25 +113,48 @@ def initialize_session_state():
     if 'feedbacks' not in st.session_state:
         st.session_state['feedbacks'] = {}
 
-def extract_text_from_docx(file):
-    """Extracts text from a DOCX file."""
-    doc = docx.Document(file)
-    return '\n'.join([para.text for para in doc.paragraphs])
-
-def extract_text_from_pdf(file):
-    """Extracts text from a PDF file."""
-    pdf_document = pymupdf.open(stream=file.read(), filetype="pdf")
-
+# Function to extract text from .pdf files
+def extract_text_from_pdf(pdf_file):
+    pdf_document = fitz.open(stream=pdf_file.read(), filetype="pdf")
     text = ""
-    for page_num in range(len(pdf_document)):
+    for page_num in range(pdf_document.page_count):
         page = pdf_document.load_page(page_num)
         text += page.get_text()
     return text
 
-def extract_text_from_txt(file):
-    """Extracts text from a TXT file."""
-    return file.read().decode('utf-8')
+# Function to extract text from .txt files
+def extract_text_from_txt(txt_file):
+    return txt_file.read().decode("utf-8")
 
+# Streamlit file uploader
+uploaded_files = st.file_uploader("Upload files", type=['docx', 'pdf', 'txt'], accept_multiple_files=True)
+
+if uploaded_files:
+    for uploaded_file in uploaded_files:
+        file_extension = os.path.splitext(uploaded_file.name)[1].lower()
+        if file_extension == '.docx':
+            try:
+                text = extract_text_from_docx(uploaded_file)
+                st.write(f"Extracted text from {uploaded_file.name}:")
+                st.write(text)
+            except Exception as e:
+                st.error(f"Error reading {uploaded_file.name}: {e}")
+        elif file_extension == '.pdf':
+            try:
+                text = extract_text_from_pdf(uploaded_file)
+                st.write(f"Extracted text from {uploaded_file.name}:")
+                st.write(text)
+            except Exception as e:
+                st.error(f"Error reading {uploaded_file.name}: {e}")
+        elif file_extension == '.txt':
+            try:
+                text = extract_text_from_txt(uploaded_file)
+                st.write(f"Extracted text from {uploaded_file.name}:")
+                st.write(text)
+            except Exception as e:
+                st.error(f"Error reading {uploaded_file.name}: {e}")
+        else:
+            st.error(f"Unsupported file type: {uploaded_file.name}")
 def main():
     initialize_session_state()
     

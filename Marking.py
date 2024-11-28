@@ -25,7 +25,7 @@ client = OpenAI(api_key=OPENAI_API_KEY)
 
 # Initialize the tiktoken encoder for GPT-4
 try:
-    encoding = tiktoken.encoding_for_model("gpt-4o")
+    encoding = tiktoken.encoding_for_model("gpt-4")
 except KeyError:
     encoding = tiktoken.get_encoding("cl100k_base")
 
@@ -45,7 +45,7 @@ def truncate_text(text, max_tokens, encoding):
         return encoding.decode(truncated_tokens)
     return text
 
-def call_chatgpt(prompt, model="gpt-4o", max_tokens=3000, temperature=0.3, retries=2):
+def call_chatgpt(prompt, model="gpt-4", max_tokens=3000, temperature=0.3, retries=2):
     """Calls the OpenAI API using the client instance and returns the response as text."""
     for attempt in range(retries):
         try:
@@ -191,6 +191,13 @@ def main():
 
                 # Generate rubric CSV string with all fields quoted
                 rubric_csv_string = original_rubric_df.to_csv(index=False, quoting=csv.QUOTE_ALL)
+
+                # Get the list of percentage range columns (e.g., '0-59%', '60-69%', etc.)
+                percentage_columns = [col for col in original_rubric_df.columns if '%' in col]
+
+                # Get the list of criteria
+                criteria_list = original_rubric_df[criterion_column].tolist()
+                criteria_string = '\n'.join(criteria_list)
 
                 # Process each student submission
                 for submission in submissions:

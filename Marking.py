@@ -151,7 +151,7 @@ def main():
 
         st.header("Upload Files")
         rubric_file = st.file_uploader("Upload Grading Rubric (CSV)", type=['csv'])
-        submissions = submissions = st.file_uploader("Upload Student Submissions (.docx, .pdf, .txt)",type=['docx', 'pdf', 'txt'] accept_multiple_files=True)
+        submissions = submissions = st.file_uploader("Upload Student Submissions (.docx, .pdf, .txt)",type=['docx', 'pdf', 'txt'], accept_multiple_files=True)
 
         if rubric_file and submissions:
             if st.button("Run Marking"):

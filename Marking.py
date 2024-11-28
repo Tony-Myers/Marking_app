@@ -1,20 +1,14 @@
 # Standard library imports
-import os
-from io import BytesIO, StringIO
-import csv
-import re
-
-# Third-party imports
 import streamlit as st
 from openai import OpenAI
 import pandas as pd
 import docx
-from docx.enum.section import WD_ORIENT
-from docx.oxml.ns import nsdecls
-from docx.oxml import parse_xml
-import tiktoken
 import fitz  # PyMuPDF
-
+from io import BytesIO, StringIO
+import tiktoken
+import csv
+import re
+import os
 
 # Set your OpenAI API key and password from secrets
 PASSWORD = st.secrets["password"]
@@ -25,7 +19,7 @@ client = OpenAI(api_key=OPENAI_API_KEY)
 
 # Initialize the tiktoken encoder for GPT-4
 try:
-    encoding = tiktoken.encoding_for_model("gpt-4o")
+    encoding = tiktoken.encoding_for_model("gpt-4")
 except KeyError:
     encoding = tiktoken.get_encoding("cl100k_base")
 
@@ -44,7 +38,7 @@ def truncate_text(text, max_tokens, encoding):
         return encoding.decode(truncated_tokens)
     return text
 
-def call_chatgpt(prompt, model="gpt-4o", max_tokens=3000, temperature=0.3, retries=2):
+def call_chatgpt(prompt, model="gpt-4", max_tokens=3000, temperature=0.3, retries=2):
     """Calls the OpenAI API using the client instance and returns the response as text."""
     for attempt in range(retries):
         try:
@@ -56,29 +50,11 @@ def call_chatgpt(prompt, model="gpt-4o", max_tokens=3000, temperature=0.3, retri
             )
             return response.choices[0].message.content.strip()
         except Exception as e:
-            if attempt < retries -1:
+            if attempt < retries - 1:
                 continue
             else:
                 st.error(f"API Error: {e}")
                 return None
-
-def extract_text_from_docx(file):
-    """Extracts text from a DOCX file."""
-    doc = docx.Document(file)
-    return '\n'.join([para.text for para in doc.paragraphs])
-
-def extract_text_from_pdf(file):
-    """Extracts text from a PDF file."""
-    pdf_document = fitz.open(stream=file.read(), filetype="pdf")
-    text = ""
-    for page_num in range(len(pdf_document)):
-        page = pdf_document.load_page(page_num)
-        text += page.get_text()
-    return text
-
-def extract_text_from_txt(file):
-    """Extracts text from a TXT file."""
-    return file.read().decode('utf-8')
 
 def check_password():
     """Prompts the user for a password and checks it."""
@@ -137,6 +113,24 @@ def initialize_session_state():
     if 'feedbacks' not in st.session_state:
         st.session_state['feedbacks'] = {}
 
+def extract_text_from_docx(file):
+    """Extracts text from a DOCX file."""
+    doc = docx.Document(file)
+    return '\n'.join([para.text for para in doc.paragraphs])
+
+def extract_text_from_pdf(file):
+    """Extracts text from a PDF file."""
+    pdf_document = fitz.open(stream=file.read(), filetype="pdf")
+    text = ""
+    for page_num in range(len(pdf_document)):
+        page = pdf_document.load_page(page_num)
+        text += page.get_text()
+    return text
+
+def extract_text_from_txt(file):
+    """Extracts text from a TXT file."""
+    return file.read().decode('utf-8')
+
 def main():
     initialize_session_state()
     
@@ -151,7 +145,7 @@ def main():
 
         st.header("Upload Files")
         rubric_file = st.file_uploader("Upload Grading Rubric (CSV)", type=['csv'])
-        submissions = submissions = st.file_uploader("Upload Student Submissions (.docx, .pdf, .txt)",type=['docx', 'pdf', 'txt'], accept_multiple_files=True)
+        submissions = st.file_uploader("Upload Student Submissions (.docx, .pdf, .txt)", type=['docx', 'pdf', 'txt'], accept_multiple_files=True)
 
         if rubric_file and submissions:
             if st.button("Run Marking"):
@@ -176,6 +170,7 @@ def main():
                 # Generate rubric CSV string with all fields quoted
                 rubric_csv_string = original_rubric_df.to_csv(index=False, quoting=csv.QUOTE_ALL)
 
+                # Get the list of percentage range columns (e.g., '0-59%', '60
                 # Get the list of percentage range columns (e.g., '0-59%', '60-69%', etc.)
                 percentage_columns = [col for col in original_rubric_df.columns if '%' in col]
 
@@ -217,16 +212,16 @@ def main():
 
                     # Prepare prompt for ChatGPT with modifications
                     prompt = f"""
-You are an experienced UK acadmic tasked with grading a student's assignment based on the provided rubric and assignment instructions. Please ensure that your feedback adheres to UK Higher Education standards for undergraduate work, noting the level provided by the user. Use British English spelling throughout your feedback.
+You are an experienced UK academic tasked with grading a student's assignment based on the provided rubric and assignment instructions. Please ensure that your feedback adheres to UK Higher Education standards for undergraduate work, noting the level provided by the user. Use British English spelling throughout your feedback.
 
 **Instructions:**
 
-- Review the student's submission thoroughly and be strict in applying the crieria.
-- For **each criterion** in the list below, assign a numerical score between 0 and 100 (e.g., 75) and provide a brief but nuianced comment.
+- Review the student's submission thoroughly and be strict in applying the criteria.
+- For **each criterion** in the list below, assign a numerical score between 0 and 100 (e.g., 75) and provide a brief but nuanced comment.
 - Ensure that the score is numeric without any extra symbols or text.
 - The scores should reflect the student's performance according to the descriptors in the rubric.
 - **Be strict in your grading to align with UK undergraduate standards.**
-- **Assess the quality of writing and referencing style, ensuring adherence to the 'Cite them Right' guidelines (2008, Pear Tree Books). Provide a brief comment on these aspects in the overall comments but refer to the referecing syyle as Birmingham Newman University’s referencing style in feedback. .**
+- **Assess the quality of writing and referencing style, ensuring adherence to the 'Cite them Right' guidelines (2008, Pear Tree Books). Provide a brief comment on these aspects in the overall comments but refer to the referencing style as Birmingham Newman University’s referencing style in feedback.**
 
 **List of Criteria:**
 {criteria_string}
@@ -323,6 +318,7 @@ Feedforward:
                                 continue
 
                             # Ensure all criteria are present
+                                                       # Ensure all criteria are present
                             missing_criteria = set(original_rubric_df[criterion_column]) - set(completed_rubric_df[criterion_column])
                             if missing_criteria:
                                 st.warning(f"The AI feedback is missing the following criteria: {missing_criteria}")
@@ -359,7 +355,13 @@ Feedforward:
                                 'total_mark': total_mark  # Store total_mark here
                             }
 
-     
+                            # Optionally, display DataFrames for debugging
+                            # st.write("Completed Rubric DataFrame:")
+                            # st.dataframe(completed_rubric_df)
+
+                            # st.write("Merged Rubric DataFrame:")
+                            # st.dataframe(merged_rubric_df)
+
                         except Exception as e:
                             st.error(f"Error parsing AI response: {e}")
                             st.write("AI Response:")
@@ -449,3 +451,8 @@ Feedforward:
 
 if __name__ == "__main__":
     main()
+
+
+ 
+
+ 

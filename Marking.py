@@ -22,7 +22,7 @@ client = OpenAI(api_key=OPENAI_API_KEY)
 
 # Initialize the tiktoken encoder for GPT-4
 try:
-    encoding = tiktoken.encoding_for_model("gpt-4")
+    encoding = tiktoken.encoding_for_model("gpt-4o")
 except KeyError:
     encoding = tiktoken.get_encoding("cl100k_base")
 
@@ -41,7 +41,7 @@ def truncate_text(text, max_tokens, encoding):
         return encoding.decode(truncated_tokens)
     return text
 
-def call_chatgpt(prompt, model="gpt-4", max_tokens=3000, temperature=0.3, retries=2):
+def call_chatgpt(prompt, model="gpt-4o", max_tokens=3000, temperature=0.3, retries=2):
     """Calls the OpenAI API using the client instance and returns the response as text."""
     for attempt in range(retries):
         try:
@@ -225,7 +225,7 @@ def main():
                             st.error(f"Failed to summarize submission for {student_name}. Skipping.")
                             continue
 
-                    # Prepare prompt for ChatGPT with modifications
+                    # Prepare prompt for ChatGPT
                     prompt = f"""
 You are an experienced UK academic tasked with grading a student's assignment based on the provided rubric and assignment instructions. Please ensure that your feedback adheres to UK Higher Education standards for undergraduate work, noting the level provided by the user. Use British English spelling throughout your feedback.
 
@@ -268,7 +268,7 @@ Please output your feedback in the exact format below, ensuring you include **al
 - **Ensure British English spelling is used.**
 - **Overall Comments should not exceed 150 words.**
 - **Feedforward should be a bulleted list within 150 words.**
-- **Comments on each criterion should be concise, in the second person, and not exceed 150 words in total.**
+- **Comments on each criterion should be concise, in the second person, and not exceed 100 words in total.**
 - **Ensure that all fields containing commas are enclosed in double quotes.**
 - **Provide an example of the expected CSV format below.**
 
@@ -285,46 +285,59 @@ Feedforward:
 - Consider using more varied sources to support your arguments and provide a broader perspective.
 
 **Note:** Additionally, please include a **Total Mark** based on the weighted scores of each criterion. This total mark should only appear in the downloaded `.docx` file and not in the Streamlit app.
-**Important**: Always address the student directly using "you".
-
                     """
 
+                    # Estimate total tokens
+                    total_tokens = count_tokens(prompt, encoding)
+                    if total_tokens > MAX_TOKENS:
+                        st.error(f"The prompt for {student_name} exceeds the maximum token limit. Please reduce the length of the rubric, assignment instructions, or the student submission.")
+                        continue
 
-                    feedback = call_chatgpt(prompt, max_tokens=1500, temperature=0.3)
+                    # Calculate max tokens for response
+                    max_response_tokens = MAX_TOKENS - total_tokens
+
+                    # Call ChatGPT API
+                    feedback = call_chatgpt(prompt, max_tokens=max_response_tokens, temperature=0.3)
                     if feedback:
                         st.success(f"Feedback generated for {student_name}")
 
-                        # Parse the feedback
+                        # Display AI's response for debugging (optional)
+                        # st.text_area("AI Response", feedback, height=300)
+
+                        # Parse the feedback and handle any formatting requirements
                         try:
-                            if 'Overall Comments:' in feedback:
+                            # Extract feedback components from AI response
+                            if 'Overall Comments:' in feedback and 'Feedforward:' in feedback:
                                 csv_feedback = feedback.split('Overall Comments:', 1)[0].strip()
                                 comments_section = feedback.split('Overall Comments:', 1)[1].strip()
+                                overall_comments = comments_section.split('Feedforward:', 1)[0].strip()
+                                feedforward = comments_section.split('Feedforward:', 1)[1].strip()
                             else:
-                                st.error("The AI's response is missing 'Overall Comments:'. Adjusting prompt and retrying.")
+                                st.error("The AI's response is missing required sections. Please adjust the prompt or try again.")
+                                st.write("AI Response:")
+                                st.code(feedback)
                                 continue
 
+                            # Check if the CSV section is present
                             if 'Criterion,Score,Comment' in csv_feedback:
                                 completed_rubric_df = parse_csv_section(csv_feedback)
                                 if completed_rubric_df is None:
                                     st.error("Failed to parse the CSV feedback.")
+                                    st.write("AI Response:")
+                                    st.code(feedback)
                                     continue
                             else:
-                                st.error("The AI's response is missing the CSV section with 'Criterion,Score,Comment'. Adjusting prompt and retrying.")
+                                st.error("The AI's response is missing the CSV section with 'Criterion,Score,Comment'. Please adjust the prompt or try again.")
+                                st.write("AI Response:")
+                                st.code(feedback)
                                 continue
 
-                            # Extract overall comments and feedforward
-                            overall_comments = ''
-                            feedforward = ''
-                            if 'Feedforward:' in comments_section:
-                                overall_comments = comments_section.split('Feedforward:', 1)[0].strip()
-                                feedforward = comments_section.split('Feedforward:', 1)[1].strip()
-                            else:
-                                overall_comments = comments_section.strip()
+                            # Ensure all criteria are present
+                            missing_criteria = set(original_rubric_df[criterion_column]) - set(completed_rubric_df[criterion_column])
+                            if missing_criteria:
+                                st.warning(f"The AI feedback is missing the following criteria: {missing_criteria}")
 
-                            # Split feedforward into individual bullet points
-                            feedforward_list = [item.strip() for item in feedforward.splitlines() if item.strip().startswith('-')]
-
-                            # Merge the dataframes with specified suffixes
+                            # Merge the dataframes
                             merged_rubric_df = original_rubric_df.merge(
                                 completed_rubric_df[[criterion_column, 'Score', 'Comment']],
                                 on=criterion_column,
@@ -336,11 +349,11 @@ Feedforward:
                             merged_rubric_df['Weighted_Score'] = merged_rubric_df['Weight'] * merged_rubric_df['Score'] / 100
                             total_mark = merged_rubric_df['Weighted_Score'].sum()
 
-                            # Store the feedback in session state
+                            # Store feedback in session state
                             st.session_state['feedbacks'][student_name] = {
                                 'merged_rubric_df': merged_rubric_df,
                                 'overall_comments': overall_comments,
-                                'feedforward': feedforward_list,
+                                'feedforward': feedforward,
                                 'percentage_columns': percentage_columns,
                                 'total_mark': total_mark
                             }
@@ -401,8 +414,7 @@ Feedforward:
                     feedback_doc.add_heading('Overall Comments', level=2)
                     feedback_doc.add_paragraph(feedback_data['overall_comments'].strip())
                     feedback_doc.add_heading('Feedforward', level=2)
-                    for line in feedback_data['feedforward']:
-                        feedback_doc.add_paragraph(line, style='ListBullet')
+                    feedback_doc.add_paragraph(feedback_data['feedforward'].strip())
 
                     feedback_doc.add_heading('Total Mark', level=2)
                     feedback_doc.add_paragraph(f"{feedback_data['total_mark']:.2f}")

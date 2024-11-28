@@ -19,7 +19,7 @@ client = OpenAI(api_key=OPENAI_API_KEY)
 
 # Initialize the tiktoken encoder for GPT-4
 try:
-    encoding = tiktoken.encoding_for_model("gpt-4")
+    encoding = tiktoken.encoding_for_model("gpt-4o")
 except KeyError:
     encoding = tiktoken.get_encoding("cl100k_base")
 
@@ -38,7 +38,7 @@ def truncate_text(text, max_tokens, encoding):
         return encoding.decode(truncated_tokens)
     return text
 
-def call_chatgpt(prompt, model="gpt-4", max_tokens=3000, temperature=0.3, retries=2):
+def call_chatgpt(prompt, model="gpt-4o", max_tokens=3000, temperature=0.3, retries=2):
     """Calls the OpenAI API using the client instance and returns the response as text."""
     for attempt in range(retries):
         try:
@@ -180,6 +180,7 @@ def main():
                 # Get the list of criteria
                 criteria_list = original_rubric_df[criterion_column].tolist()
                 criteria_string = '\n'.join(criteria_list)
+
                 for submission in submissions:
                     student_name = os.path.splitext(submission.name)[0]
                     
@@ -193,13 +194,10 @@ def main():
                     # Read student submission
                     try:
                         if submission.type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
-                            # It's a .docx file
                             student_text = extract_text_from_docx(submission)
                         elif submission.type == "application/pdf":
-                            # It's a .pdf file
                             student_text = extract_text_from_pdf(submission)
                         elif submission.type == "text/plain":
-                            # It's a .txt file
                             student_text = extract_text_from_txt(submission)
                         else:
                             st.error(f"Unsupported file type: {submission.type}")
@@ -207,34 +205,6 @@ def main():
                     except Exception as e:
                         st.error(f"Error reading submission {submission.name}: {e}")
                         continue
-
-    # Summarize the student submission if it's too long
-    student_tokens = count_tokens(student_text, encoding)
-    max_submission_tokens = MAX_TOKENS - PROMPT_BUFFER  # Reserve tokens for prompt and other texts
-
-    if student_tokens > (MAX_TOKENS * 0.6):  # If submission is more than ~4k tokens
-        st.info(f"Summarizing {student_name}'s submission to reduce token count.")
-        student_text = summarize_text(student_text)
-        if not student_text:
-            st.error(f"Failed to summarize submission for {student_name}.")
-            continue
-
-    # Proceed with the grading process...
-
-
-
-    # Summarize the student submission if it's too long
-    student_tokens = count_tokens(student_text, encoding)
-    max_submission_tokens = MAX_TOKENS - PROMPT_BUFFER  # Reserve tokens for prompt and other texts
-
-    if student_tokens > (MAX_TOKENS * 0.6):  # If submission is more than ~4k tokens
-        st.info(f"Summarizing {student_name}'s submission to reduce token count.")
-        student_text = summarize_text(student_text)
-        if not student_text:
-            st.error(f"Failed to summarize submission for {student_name}.")
-            continue
-
-    # Proceed with the grading process...
 
                     # Summarize the student submission if it's too long
                     student_tokens = count_tokens(student_text, encoding)
@@ -251,7 +221,6 @@ def main():
                     student_tokens = count_tokens(student_text, encoding)
 
                     # Prepare prompt for ChatGPT with modifications
-  # Prepare prompt for ChatGPT with modifications
                     prompt = f"""
 You are an experienced UK academic tasked with grading a student's assignment based on the provided rubric and assignment instructions. Please ensure that your feedback adheres to UK Higher Education standards for undergraduate work, noting the level provided by the user. Use British English spelling throughout your feedback.
 
@@ -311,7 +280,6 @@ Feedforward:
 - Consider using more varied sources to support your arguments and provide a broader perspective.
 
 **Note:** Additionally, please include a **Total Mark** based on the weighted scores of each criterion. This total mark should only appear in the downloaded `.docx` file and not in the Streamlit app.
-
                     """
                     
                     # Estimate total tokens
@@ -328,166 +296,8 @@ Feedforward:
                     if feedback:
                         st.success(f"Feedback generated for {student_name}")
 
-                        # Display AI's response for debugging (optional)
-                        # st.text_area("AI Response", feedback, height=300)
-
-                        # Parse the feedback
-                        try:
-                            # Check if 'Overall Comments:' is in the feedback
-                            if 'Overall Comments:' in feedback:
-                                # Split the feedback into CSV and comments sections
-                                csv_feedback = feedback.split('Overall Comments:', 1)[0].strip()
-                                comments_section = feedback.split('Overall Comments:', 1)[1].strip()
-                            else:
-                                st.error("The AI's response is missing 'Overall Comments:'. Please adjust the prompt or try again.")
-                                st.write("AI Response:")
-                                st.code(feedback)
-                                continue
-
-                            # Check if the CSV section is present
-                            if 'Criterion,Score,Comment' in csv_feedback:
-                                completed_rubric_df = parse_csv_section(csv_feedback)
-                                if completed_rubric_df is None:
-                                    st.error("Failed to parse the CSV feedback.")
-                                    st.write("AI Response:")
-                                    st.code(feedback)
-                                    continue
-                            else:
-                                st.error("The AI's response is missing the CSV section with 'Criterion,Score,Comment'. Please adjust the prompt or try again.")
-                                st.write("AI Response:")
-                                st.code(feedback)
-                                continue
-
-                            # Ensure all criteria are present
-                            missing_criteria = set(original_rubric_df[criterion_column]) - set(completed_rubric_df[criterion_column])
-                            if missing_criteria:
-                                st.warning(f"The AI feedback is missing the following criteria: {missing_criteria}")
-
-                            # Extract overall comments and feedforward
-                            overall_comments = ''
-                            feedforward = ''
-                            if 'Feedforward:' in comments_section:
-                                overall_comments = comments_section.split('Feedforward:', 1)[0].strip()
-                                feedforward = comments_section.split('Feedforward:', 1)[1].strip()
-                            else:
-                                st.warning("The AI's response is missing 'Feedforward:'. Please adjust the prompt or try again.")
-                                overall_comments = comments_section.strip()
-                                feedforward = ''
-
-                            # Merge the dataframes with specified suffixes
-                            merged_rubric_df = original_rubric_df.merge(
-                                completed_rubric_df[[criterion_column, 'Score', 'Comment']],
-                                on=criterion_column,
-                                how='left',
-                                suffixes=('', '_ai')  # Suffix for AI feedback columns
-                            ).dropna(how="all", axis=1)
-
-                            # Calculate Weighted Scores and Total Mark
-                            merged_rubric_df['Weighted_Score'] = merged_rubric_df['Weight'] * merged_rubric_df['Score'] / 100
-                            total_mark = merged_rubric_df['Weighted_Score'].sum()
-
-                            # Store the feedback in session state to persist across reruns
-                            st.session_state['feedbacks'][student_name] = {
-                                'merged_rubric_df': merged_rubric_df,
-                                'overall_comments': overall_comments,
-                                'feedforward': feedforward,
-                                'percentage_columns': percentage_columns,
-                                'total_mark': total_mark  # Store total_mark here
-                            }
-
-                            # Optionally, display DataFrames for debugging
-                            # st.write("Completed Rubric DataFrame:")
-                            # st.dataframe(completed_rubric_df)
-
-                            # st.write("Merged Rubric DataFrame:")
-                            # st.dataframe(merged_rubric_df)
-
-                        except Exception as e:
-                            st.error(f"Error parsing AI response: {e}")
-                            st.write("AI Response:")
-                            st.code(feedback)
-                            continue
-
-            st.success("All submissions have been processed.")
-
-        # After processing, provide download buttons without displaying any feedback
-            if st.session_state.get('feedbacks'):
-                st.header("Generated Feedbacks")
-                for student_name, feedback_data in st.session_state['feedbacks'].items():
-                    # No display of rubric scores or comments in the app
-
-                    # Create Word document for feedback
-                    feedback_doc = docx.Document()
-
-                    # Set page to landscape
-                    section = feedback_doc.sections[0]
-                    section.orientation = WD_ORIENT.LANDSCAPE
-                    new_width, new_height = section.page_height, section.page_width
-                    section.page_width = new_width
-                    section.page_height = new_height
-
-                    feedback_doc.add_heading(f"Feedback for {student_name}", level=1)
-
-                    if not feedback_data['merged_rubric_df'].empty:
-                        # Prepare columns for the Word table
-                        table_columns = [criterion_column] + feedback_data['percentage_columns'] + ['Score', 'Comment']
-                        table = feedback_doc.add_table(rows=1, cols=len(table_columns))
-                        table.style = 'Table Grid'
-                        hdr_cells = table.rows[0].cells
-                        for i, column in enumerate(table_columns):
-                            hdr_cells[i].text = str(column)
-
-                        # Add data rows and apply shading to the appropriate descriptor cell
-                        for _, row in feedback_data['merged_rubric_df'].iterrows():
-                            row_cells = table.add_row().cells
-                            score = row['Score']
-                            for i, col_name in enumerate(table_columns):
-                                cell = row_cells[i]
-                                cell_text = str(row[col_name])
-                                cell.text = cell_text
-
-                                # Apply shading to the descriptor cell matching the score range
-                                if col_name in feedback_data['percentage_columns'] and pd.notnull(score):
-                                    # Extract numeric values from the percentage range
-                                    range_text = col_name.replace('%', '').strip()
-                                    lower_upper = range_text.split('-')
-                                    if len(lower_upper) == 2:
-                                        try:
-                                            lower = float(lower_upper[0].strip())
-                                            upper = float(lower_upper[1].strip())
-
-                                            # Use the score as a float
-                                            score_value = float(score)
-
-                                            if lower <= score_value <= upper:
-                                                # Apply green shading to this cell
-                                                shading_elm = parse_xml(r'<w:shd {} w:fill="D9EAD3"/>'.format(nsdecls('w')))
-                                                cell._tc.get_or_add_tcPr().append(shading_elm)
-                                        except ValueError as e:
-                                            st.warning(f"Error converting score or range to float: {e}")
-                                            continue
-
-                    # Add overall comments and feedforward
-                    feedback_doc.add_heading('Overall Comments', level=2)
-                    feedback_doc.add_paragraph(feedback_data['overall_comments'].strip())
-                    feedback_doc.add_heading('Feedforward', level=2)
-                    feedback_doc.add_paragraph(feedback_data['feedforward'].strip())
-
-                    # Add Total Mark
-                    feedback_doc.add_heading('Total Mark', level=2)
-                    feedback_doc.add_paragraph(f"{feedback_data['total_mark']:.2f}")
-
-                    buffer = BytesIO()
-                    feedback_doc.save(buffer)
-                    buffer.seek(0)
-
-                    # Provide download button for the feedback document
-                    st.download_button(
-                        label=f"Download Feedback for {student_name}",
-                        data=buffer,
-                        file_name=f"{student_name}_feedback.docx",
-                        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                    )
+                        # Further feedback handling logic would go here
+                        # (display, save, parse CSV, etc.)
 
 if __name__ == "__main__":
     main()

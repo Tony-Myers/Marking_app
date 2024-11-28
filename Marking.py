@@ -234,8 +234,8 @@ You are an experienced UK academic tasked with grading a student's assignment ba
 1. Provide feedback directly addressed to the student using **second-person perspective** ("you").
 2. Structure the feedback in three distinct sections:
     a. CSV feedback in the format "Criterion,Score,Comment".
-    b. **Overall Comments**: Detailed comments on the student's work, always using "you" to address the student directly.
-    c. **Feedforward**: Specific actionable suggestions for improvement, also using "you".
+    b. **Overall Comments**: Detailed comments on the student's work (limit to 150 words), always using "you" to address the student directly.
+    c. **Feedforward**: Specific actionable suggestions for improvement, presented as a bulleted list (within 150 words), using "you" throughout.
 
 **List of Criteria**:
 {criteria_string}
@@ -252,8 +252,8 @@ You are an experienced UK academic tasked with grading a student's assignment ba
 **Your Output Format**:
 
 - Start with the CSV section, starting with "Criterion,Score,Comment".
-- Include "Overall Comments:" followed by the overall comments text.
-- Include "Feedforward:" followed by the suggestions.
+- Include "Overall Comments:" followed by the overall comments text (maximum of 150 words).
+- Include "Feedforward:" followed by the suggestions as a bulleted list.
 
 **Ensure strict adherence to this format**:
 
@@ -261,7 +261,9 @@ CSV Section (starts with "Criterion,Score,Comment")
 Overall Comments:
 <overall_comments>
 Feedforward:
-<feedforward>
+- <feedforward_1>
+- <feedforward_2>
+...
 
 **Important**: Always address the student directly using "you".
 """
@@ -374,7 +376,8 @@ Feedforward:
                     feedback_doc.add_heading('Overall Comments', level=2)
                     feedback_doc.add_paragraph(feedback_data['overall_comments'].strip())
                     feedback_doc.add_heading('Feedforward', level=2)
-                    feedback_doc.add_paragraph(feedback_data['feedforward'].strip())
+                    for line in feedback_data['feedforward'].splitlines():
+                        feedback_doc.add_paragraph(line.strip(), style='ListBullet')
 
                     feedback_doc.add_heading('Total Mark', level=2)
                     feedback_doc.add_paragraph(f"{feedback_data['total_mark']:.2f}")

@@ -3,7 +3,7 @@ import streamlit as st
 from openai import OpenAI
 import pandas as pd
 import docx
-import fitz  # PyMuPDF
+import pymupdf
 from io import BytesIO, StringIO
 import tiktoken
 import csv
@@ -120,7 +120,8 @@ def extract_text_from_docx(file):
 
 def extract_text_from_pdf(file):
     """Extracts text from a PDF file."""
-    pdf_document = fitz.open(stream=file.read(), filetype="pdf")
+    pdf_document = pymupdf.open(stream=file.read(), filetype="pdf")
+
     text = ""
     for page_num in range(len(pdf_document)):
         page = pdf_document.load_page(page_num)

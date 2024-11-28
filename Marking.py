@@ -180,32 +180,33 @@ def main():
                 # Get the list of criteria
                 criteria_list = original_rubric_df[criterion_column].tolist()
                 criteria_string = '\n'.join(criteria_list)
+                for submission in submissions:
+                    student_name = os.path.splitext(submission.name)[0]
+                    
+                    # Skip if feedback already exists for this student
+                    if student_name in st.session_state['feedbacks']:
+                        st.info(f"Feedback already generated for {student_name}.")
+                        continue
 
-             for submission in submissions:
-    student_name = os.path.splitext(submission.name)[0]
-    
-    # Skip if feedback already exists for this student
-    if student_name in st.session_state['feedbacks']:
-        st.info(f"Feedback already generated for {student_name}.")
-        continue
+                    st.header(f"Processing {student_name}'s Submission")
 
-    st.header(f"Processing {student_name}'s Submission")
-
-    # Read student submission
-    try:
-        if submission.type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
-            student_text = extract_text_from_docx(submission)
-        elif submission.type == "application/pdf":
-            student_text = extract_text_from_pdf(submission)
-        elif submission.type == "text/plain":
-            student_text = extract_text_from_txt(submission)
-        else:
-            st.error(f"Unsupported file type: {submission.type}")
-            continue
-    except Exception as e:
-        st.error(f"Error reading submission {submission.name}: {e}")
-        continue
-
+                    # Read student submission
+                    try:
+                        if submission.type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
+                            # It's a .docx file
+                            student_text = extract_text_from_docx(submission)
+                        elif submission.type == "application/pdf":
+                            # It's a .pdf file
+                            student_text = extract_text_from_pdf(submission)
+                        elif submission.type == "text/plain":
+                            # It's a .txt file
+                            student_text = extract_text_from_txt(submission)
+                        else:
+                            st.error(f"Unsupported file type: {submission.type}")
+                            continue
+                    except Exception as e:
+                        st.error(f"Error reading submission {submission.name}: {e}")
+                        continue
 
     # Summarize the student submission if it's too long
     student_tokens = count_tokens(student_text, encoding)
